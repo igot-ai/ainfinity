@@ -1,0 +1,14 @@
+# Virtual environments
+.env
+.venv/
+venv/
+
+.idea/
+__pycache__/
+
+
+*.pyc
+*.pyo
+*.pyd
+
+app/models/alembic.ini
