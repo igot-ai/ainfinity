@@ -1,0 +1,12 @@
+name: ucla-cmllab/orca-chat-chat-format
+text_col: messages
+split:
+  train:
+    name: train
+    max_samples: 1024
+  validation:
+    name: train # mock validation
+    max_samples: 128
+
+revision: main
+num_proc: 2
