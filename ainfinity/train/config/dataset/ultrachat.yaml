@@ -1,0 +1,10 @@
+dataset: HuggingFaceH4/ultrachat_200k
+conversation_col: messages
+split:
+  train: train_sft
+  validation: test_sft
+
+max_train_samples:
+max_eval_samples:
+max_test_samples:
+shuffle: true

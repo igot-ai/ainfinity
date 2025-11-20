@@ -1,0 +1,41 @@
+defaults:
+  - _self_
+  - dataset: ultrachat
+  - model: qwen3
+
+
+
+training_arguments:
+  optim: adamw_torch_fused
+  bf16: true
+  do_train: true
+  do_eval: true
+  do_predict: true
+  output_dir: "./finetuning-checkpoints"
+  num_train_epochs: 5
+  per_device_train_batch_size: 512
+  per_device_eval_batch_size: 512
+  gradient_accumulation_steps: 1
+  eval_accumulation_steps: 1
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  learning_rate: 5e-05
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.01
+  weight_decay: 0.01
+  logging_steps: 10
+  tf32: true
+  gradient_checkpointing: false
+  disable_tqdm: true
+  report_to: "wandb"
+  logging_dir: "./logs"
+  load_best_model_at_end: true
+  torch_compile: false
+  save_total_limit: 3
+  overwrite_output_dir: true
+  metric_for_best_model: ""
+  logging_strategy: steps
+  seed: 0
+  push_to_hub: false
+  hub_model_id: null
+  use_liger_kernel: true
