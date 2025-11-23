@@ -17,7 +17,6 @@ resources:
   accelerators: RTX5090:1
   image_id: docker:vastai/pytorch:cuda-12.8.1-auto
   disk_size: 128
-
 workdir: .
 setup: "set -euo pipefail\n\necho \"\U0001F527 Installing CUDA development libraries for Triton compilation...\"\n\npython3 -m venv /opt/unsloth_env\nsource /opt/unsloth_env/bin/activate\n\n# Upgrade pip and setuptools inside venv\npip install --upgrade pip setuptools\n\n# Install main packages in one go\npip install \\\n  torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 \n\npip install \\\n  transformers datasets \"trl>=0.18.2,<0.24.0\" accelerate peft bitsandbytes \\\n  \"unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git\" \\\n  fastapi uvicorn ninja\n\n# Verify CUDA\npython -c \"import torch; print('CUDA available:', torch.cuda.is_available())\"\n"
 run: |-

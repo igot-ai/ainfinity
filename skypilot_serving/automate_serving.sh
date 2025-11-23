@@ -5,11 +5,11 @@ set -euo pipefail
 CLUSTER_NAME="pipeline_unsloth"
 YAML_FILE="serving.yaml"
 CONFIG_FILE="${CONFIG_FILE:-config/example_config.json}"
-KEY_PATH="$HOME/.ssh/id_ed25519.pub"     
-POLL_INTERVAL=10                         
-TIMEOUT=600                              
-SYNC_INTERVAL=30                         
-REMOTE_OUTPUT_DIR="/root/sky_workdir/outputs"             
+KEY_PATH="$HOME/.ssh/id_ed25519.pub"
+POLL_INTERVAL=10
+TIMEOUT=600
+SYNC_INTERVAL=30
+REMOTE_OUTPUT_DIR="/root/sky_workdir/outputs"
 LOCAL_OUTPUT_DIR="./outputs"
 
 # === STEP 0: Merge JSON config into YAML file ===
