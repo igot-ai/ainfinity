@@ -1,0 +1,36 @@
+# To update this YAML from JSON config using yq, run (from skypilot_serving/ directory):
+# yq eval '.envs = load("config/example_config.json").envs | .resources = load("config/example_config.json").resources | .file_mounts = load("config/example_config.json").file_mounts | .workdir = load("config/example_config.json").workdir' -P -i serving.yaml
+#
+# Or to output to a new file:
+# yq eval '.envs = load("config/example_config.json").envs | .resources = load("config/example_config.json").resources | .file_mounts = load("config/example_config.json").file_mounts | .workdir = load("config/example_config.json").workdir' -P serving.yaml > serving.yaml.new
+#
+# Note: This updates envs, resources, file_mounts, and workdir from the JSON config.
+# The setup and run sections are preserved but may need manual formatting adjustment.
+
+envs:
+  OUTPUT_DIR: outputs
+  MODEL_NAME: unsloth/llama-3-8b-preview
+  MAX_SEQ_LENGTH: 2048
+  HOST: 127.0.0.1
+  PORT: 8000
+resources:
+  accelerators: RTX5090:1
+  image_id: docker:vastai/pytorch:cuda-12.8.1-auto
+  disk_size: 128
+
+workdir: .
+setup: "set -euo pipefail\n\necho \"\U0001F527 Installing CUDA development libraries for Triton compilation...\"\n\npython3 -m venv /opt/unsloth_env\nsource /opt/unsloth_env/bin/activate\n\n# Upgrade pip and setuptools inside venv\npip install --upgrade pip setuptools\n\n# Install main packages in one go\npip install \\\n  torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 \n\npip install \\\n  transformers datasets \"trl>=0.18.2,<0.24.0\" accelerate peft bitsandbytes \\\n  \"unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git\" \\\n  fastapi uvicorn ninja\n\n# Verify CUDA\npython -c \"import torch; print('CUDA available:', torch.cuda.is_available())\"\n"
+run: |-
+  # Create output directory if it doesn't exist
+  mkdir -p $OUTPUT_DIR/unsloth-output
+
+  # Activate the virtual environment
+  source /opt/unsloth_env/bin/activate
+  export UNSLOTH_RETURN_LOGITS=1
+  # Run the unsloth fine-tuning example
+  python3 unsloth_example.py --model-name $MODEL_NAME --output-dir $OUTPUT_DIR/unsloth-output --max-seq-length $MAX_SEQ_LENGTH
+
+  echo "✅ Fine-tuning completed. Model saved to: $OUTPUT_DIR"
+  python3 unsloth_inference.py --model-name $MODEL_NAME --weights-folder $OUTPUT_DIR/unsloth-output --max-seq-length $MAX_SEQ_LENGTH
+file_mounts:
+  /outputs: ./outputs

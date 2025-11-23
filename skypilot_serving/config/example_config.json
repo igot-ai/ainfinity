@@ -1,0 +1,18 @@
+{
+  "envs": {
+    "OUTPUT_DIR": "outputs",
+    "MODEL_NAME": "unsloth/llama-3-8b-preview",
+    "MAX_SEQ_LENGTH": 2048,
+    "HOST": "127.0.0.1",
+    "PORT": 8000
+  },
+  "resources": {
+    "accelerators": "RTX5090:1",
+    "image_id": "docker:vastai/pytorch:cuda-12.8.1-auto",
+    "disk_size": 128
+  },
+  "file_mounts": {
+    "/outputs": "./outputs"
+  },
+  "workdir": "."
+}
