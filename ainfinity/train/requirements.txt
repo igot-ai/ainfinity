@@ -1,0 +1,14 @@
+skypilot[gcp]
+unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
+wandb
+torch
+transformers
+datasets
+trl
+accelerate
+bitsandbytes
+fastapi
+uvicorn
+pydantic
+jinja2
+python-multipart
