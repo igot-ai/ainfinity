@@ -1,0 +1,16 @@
+name: {{ job_name }}
+
+resources:
+  accelerators: {{ accelerator_type }}
+  cloud: gcp
+  ports:
+    - 8000
+
+setup: |
+  pip install vllm
+
+run: |
+  python -m vllm.entrypoints.openai.api_server \
+    --model {{ model_path }} \
+    --port 8000 \
+    --host 0.0.0.0

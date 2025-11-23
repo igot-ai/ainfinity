@@ -1,0 +1,26 @@
+name: {{ job_name }}
+
+resources:
+  accelerators: {{ accelerator_type }}
+  cloud: gcp
+  disk_size: 100
+
+setup: |
+  echo "Setting up environment..."
+  pip install --upgrade pip
+  pip install -r requirements.txt
+  # Ensure unsloth is installed
+  pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+
+run: |
+  echo "Starting training for {{ model_name }}..."
+  
+  # Download dataset from URL if provided, or use local path
+  # In a real scenario, we might download from GCS/S3 here
+  
+  python train.py \
+    --model_name "{{ base_model }}" \
+    --dataset_path "{{ dataset_path }}" \
+    --output_dir "{{ output_dir }}" \
+    --project_name "{{ project_name }}" \
+    --run_name "{{ run_name }}"
