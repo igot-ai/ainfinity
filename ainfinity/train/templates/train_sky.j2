@@ -14,10 +14,10 @@ setup: |
 
 run: |
   echo "Starting training for {{ model_name }}..."
-  
+
   # Download dataset from URL if provided, or use local path
   # In a real scenario, we might download from GCS/S3 here
-  
+
   python train.py \
     --model_name "{{ base_model }}" \
     --dataset_path "{{ dataset_path }}" \
