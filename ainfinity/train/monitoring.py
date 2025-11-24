@@ -1,24 +1,24 @@
-import os
 import logging
+import os
+from typing import Any, Dict, Optional
+
 import wandb
-from typing import Dict, Any, Optional
 
 # Configure standard logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("training.log")
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("training.log")],
 )
 logger = logging.getLogger(__name__)
+
 
 class ExperimentTracker:
     """
     Standardized tracker for SLM fine-tuning experiments.
     Wraps WandB and local logging to ensure consistent tracking.
     """
+
     def __init__(self, project_name: str, run_name: Optional[str] = None, config: Optional[Dict[str, Any]] = None):
         self.project_name = project_name
         self.run_name = run_name
@@ -28,14 +28,10 @@ class ExperimentTracker:
     def _setup(self):
         """Initialize tracking backends."""
         logger.info(f"Initializing experiment: {self.project_name} / {self.run_name}")
-        
+
         # Initialize WandB
         try:
-            wandb.init(
-                project=self.project_name,
-                name=self.run_name,
-                config=self.config
-            )
+            wandb.init(project=self.project_name, name=self.run_name, config=self.config)
             logger.info("WandB initialized successfully.")
         except Exception as e:
             logger.error(f"Failed to initialize WandB: {e}")
@@ -51,10 +47,7 @@ class ExperimentTracker:
         """Log an artifact (model, dataset, etc.)."""
         logger.info(f"Logging artifact: {artifact_path} ({artifact_type})")
         if wandb.run:
-            artifact = wandb.Artifact(
-                name=os.path.basename(artifact_path),
-                type=artifact_type
-            )
+            artifact = wandb.Artifact(name=os.path.basename(artifact_path), type=artifact_type)
             artifact.add_file(artifact_path)
             wandb.log_artifact(artifact)
 
@@ -63,6 +56,7 @@ class ExperimentTracker:
         logger.info("Finishing experiment.")
         if wandb.run:
             wandb.finish()
+
 
 def get_tracker(project_name: str, run_name: str, config: Dict[str, Any]) -> ExperimentTracker:
     return ExperimentTracker(project_name, run_name, config)

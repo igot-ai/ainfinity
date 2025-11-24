@@ -1,10 +1,12 @@
 import json
 import os
-from typing import List, Optional, Dict
 from datetime import datetime
+from typing import List, Optional
+
 from schemas import ModelInfo
 
 REGISTRY_FILE = "registry.json"
+
 
 class ModelRegistry:
     def __init__(self):
@@ -15,7 +17,7 @@ class ModelRegistry:
             self.models = {}
             self._save_registry()
         else:
-            with open(REGISTRY_FILE, 'r') as f:
+            with open(REGISTRY_FILE, "r") as f:
                 self.models = json.load(f)
 
     def _save_registry(self):
@@ -24,7 +26,7 @@ class ModelRegistry:
         @TODO: integrate model registry with Datahub
         https://opendatahub.io/docs/working-with-model-registries/#creating-a-model-registry_model-registry
         """
-        with open(REGISTRY_FILE, 'w') as f:
+        with open(REGISTRY_FILE, "w") as f:
             json.dump(self.models, f, indent=2)
 
     def register_model(self, model_id: str, base_model: str, status: str = "training") -> ModelInfo:
@@ -33,7 +35,7 @@ class ModelRegistry:
             "status": status,
             "base_model": base_model,
             "created_at": datetime.now().isoformat(),
-            "artifact_path": None
+            "artifact_path": None,
         }
         self.models[model_id] = model_info
         self._save_registry()
@@ -52,5 +54,6 @@ class ModelRegistry:
 
     def list_models(self) -> List[ModelInfo]:
         return [ModelInfo(**m) for m in self.models.values()]
+
 
 registry = ModelRegistry()
