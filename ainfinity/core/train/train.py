@@ -200,8 +200,8 @@ def main():
 
     # 8. Update local registry with artifact path
     try:
-        import json
         import fcntl
+        import json
         import time
 
         registry_path = "train/services/registry.json"
@@ -240,7 +240,7 @@ def main():
                         finally:
                             # Release lock
                             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                except (IOError, OSError) as e:
+                except (IOError, OSError):
                     if attempt < max_retries - 1:
                         logger.warning(
                             f"Registry lock attempt {attempt + 1} failed, retrying..."

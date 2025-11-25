@@ -3,8 +3,10 @@ import subprocess  # nosec B404
 import uuid
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+
+from .infrastructure.registry import registry
+from .infrastructure.sky_wrapper import sky_service
 from .schemas import DeployRequest, ModelInfo
-from .infrastructure import registry, sky_service
 
 app = FastAPI(title="SLM Fine-tuning Microservice")
 
@@ -42,12 +44,10 @@ async def fine_tune(
             outfile.write(content)
 
     # Register model
-    # model_info = registry.register_model(model_id, model_name)
+    model_info = registry.register_model(model_id, model_name)
 
     # Launch training
-    cmd = sky_service.launch_training(
-        model_id, model_name, os.path.abspath(dataset_path)
-    )
+    cmd = sky_service.launch_training(model_id, model_name, os.path.abspath(dataset_path))
     background_tasks.add_task(run_sky_command, cmd)
 
     return model_info

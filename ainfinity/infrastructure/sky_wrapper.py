@@ -45,14 +45,14 @@ class SkyWrapper:
         cmd = f"sky launch -c {job_name} {config_path} -d --down --env WANDB_API_KEY=$WANDB_API_KEY -y"
         return cmd
 
-    def launch_serving(self, model_id: str, model_path: str) -> str:
+    def launch_serving(self, model_id: str, model_path: str) -> tuple[str, int]:
         job_name = f"serve-{model_id}"
 
         # Generate a unique port based on model_id (range: 8001-8999)
         # This ensures each model gets a consistent, unique port
         import hashlib
 
-        port_hash = int(hashlib.md5(model_id.encode()).hexdigest()[:4], 16)
+        port_hash = int(hashlib.md5(model_id.encode(), usedforsecurity=False).hexdigest()[:4], 16)
         port = 8001 + (port_hash % 999)
 
         config_path = self._generate_config(
