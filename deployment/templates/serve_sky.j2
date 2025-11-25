@@ -4,7 +4,7 @@ resources:
   accelerators: {{ accelerator_type }}
   cloud: gcp
   ports:
-    - 8000
+    - {{ port }}
 
 setup: |
   pip install vllm
@@ -12,5 +12,5 @@ setup: |
 run: |
   python -m vllm.entrypoints.openai.api_server \
     --model {{ model_path }} \
-    --port 8000 \
+    --port {{ port }} \
     --host 0.0.0.0

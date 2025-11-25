@@ -3,14 +3,15 @@ import subprocess  # nosec B404
 import uuid
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
-from schemas import DeployRequest, ModelInfo
-from services.registry import registry
-from services.sky_wrapper import sky_service
+from .schemas import DeployRequest, ModelInfo
+from .infrastructure import registry, sky_service
 
 app = FastAPI(title="SLM Fine-tuning Microservice")
 
 DATA_DIR = "data"
+MODELS_DIR = "models"
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)
 
 
 def run_sky_command(cmd: str):
@@ -24,7 +25,7 @@ def run_sky_command(cmd: str):
 async def fine_tune(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
-    model_name: str = Form("unsloth/llama-3-8b-bnb-4bit"),
+    model_name: str = Form("unsloth/Llama-3.2-1B-bnb-4bit"),
     epochs: int = Form(1),
 ):
     model_id = str(uuid.uuid4())[:8]
@@ -41,10 +42,12 @@ async def fine_tune(
             outfile.write(content)
 
     # Register model
-    model_info = registry.register_model(model_id, model_name)
+    # model_info = registry.register_model(model_id, model_name)
 
     # Launch training
-    cmd = sky_service.launch_training(model_id, model_name, os.path.abspath(dataset_path))
+    cmd = sky_service.launch_training(
+        model_id, model_name, os.path.abspath(dataset_path)
+    )
     background_tasks.add_task(run_sky_command, cmd)
 
     return model_info
@@ -61,11 +64,13 @@ async def deploy_model(request: DeployRequest, background_tasks: BackgroundTasks
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
 
-    # Assuming artifact path is set after training
-    # For demo, we'll use the base model if artifact path is missing
-    model_path = model.artifact_path or model.base_model
+    model_path = model.artifact_path
 
-    cmd = sky_service.launch_serving(request.model_id, model_path)
+    cmd, port = sky_service.launch_serving(request.model_id, model_path)
     background_tasks.add_task(run_sky_command, cmd)
 
-    return {"status": "deployment_initiated", "job_id": f"serve-{request.model_id}"}
+    return {
+        "status": "deployment_initiated",
+        "job_id": f"serve-{request.model_id}",
+        "port": port,
+    }

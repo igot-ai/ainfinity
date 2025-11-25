@@ -5,12 +5,13 @@ resources:
   cloud: gcp
   disk_size: 100
 
+file_mounts:
+  /train : ./train
+
 setup: |
   echo "Setting up environment..."
   pip install --upgrade pip
   pip install -r requirements.txt
-  # Ensure unsloth is installed
-  pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
 
 run: |
   echo "Starting training for {{ model_name }}..."
@@ -19,6 +20,7 @@ run: |
   # In a real scenario, we might download from GCS/S3 here
 
   python train.py \
+    --model_id "{{ model_id }}" \
     --model_name "{{ base_model }}" \
     --dataset_path "{{ dataset_path }}" \
     --output_dir "{{ output_dir }}" \
