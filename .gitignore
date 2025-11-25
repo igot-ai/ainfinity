@@ -12,3 +12,4 @@ __pycache__/
 *.pyd
 
 app/models/alembic.ini
+data/*
