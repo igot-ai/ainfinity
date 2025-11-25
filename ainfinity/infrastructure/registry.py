@@ -3,9 +3,9 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
-from schemas import ModelInfo
+from train.schemas import ModelInfo
 
-REGISTRY_FILE = "registry.json"
+REGISTRY_FILE = "train/services/registry.json"
 
 
 class ModelRegistry:
@@ -29,7 +29,9 @@ class ModelRegistry:
         with open(REGISTRY_FILE, "w") as f:
             json.dump(self.models, f, indent=2)
 
-    def register_model(self, model_id: str, base_model: str, status: str = "training") -> ModelInfo:
+    def register_model(
+        self, model_id: str, base_model: str, status: str = "training"
+    ) -> ModelInfo:
         model_info = {
             "model_id": model_id,
             "status": status,
@@ -41,7 +43,9 @@ class ModelRegistry:
         self._save_registry()
         return ModelInfo(**model_info)
 
-    def update_status(self, model_id: str, status: str, artifact_path: Optional[str] = None):
+    def update_status(
+        self, model_id: str, status: str, artifact_path: Optional[str] = None
+    ):
         if model_id in self.models:
             self.models[model_id]["status"] = status
             if artifact_path:
