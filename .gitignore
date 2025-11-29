@@ -11,4 +11,6 @@ __pycache__/
 *.pyo
 *.pyd
 
-app/models/alembic.ini
+logs/
+wandb/
+outputs/

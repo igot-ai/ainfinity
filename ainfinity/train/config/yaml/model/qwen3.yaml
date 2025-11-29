@@ -1,0 +1,12 @@
+pretrained_model_name_or_path: Qwen/Qwen3-0.6B
+padding_side: left
+truncation_side: left
+model_max_length: 4096
+cache_dir: ./cached
+revision:
+use_fast: true
+trust_remote_code: true
+attn_implementation: eager
+enable_thinking: false
+instruction_template: <|im_start|>user
+response_template: <|im_start|>assistant
