@@ -2,9 +2,9 @@
 
 cd "$(dirname "$0")/../../" || exit
 
-ACCELERATE_CONFIG="./ainfinity/core/config/accelerate_config/ds2_config.yaml"
+ACCELERATE_CONFIG="./ainfinity/train/config/accelerate_config/ds2_config.yaml"
 
-PYTHON_FILE="./ainfinity/core/finetune.py"
+PYTHON_FILE="./ainfinity/train/finetune.py"
 
 accelerate launch \
   --config_file "$ACCELERATE_CONFIG" \
