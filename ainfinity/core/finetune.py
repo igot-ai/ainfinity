@@ -6,14 +6,22 @@ from accelerate import Accelerator
 from datasets import load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
 from omegaconf import DictConfig
-from transformers import (AutoConfig, AutoModelForCausalLM, AutoTokenizer,
-                          PreTrainedTokenizerFast, Trainer, TrainingArguments,
-                          set_seed)
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedTokenizerFast,
+    Trainer,
+    TrainingArguments,
+    set_seed,
+)
 from trl import DataCollatorForCompletionOnlyLM
 
-from ainfinity.core.helper import (configure_hub_settings,
-                                   print_trainable_parameters,
-                                   select_torch_compute)
+from ainfinity.core.helper import (
+    configure_hub_settings,
+    print_trainable_parameters,
+    select_torch_compute,
+)
 from ainfinity.utils import settings
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"

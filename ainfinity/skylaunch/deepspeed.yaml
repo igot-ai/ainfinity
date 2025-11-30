@@ -20,6 +20,6 @@ setup: |
 
 run: |
   source .venv/bin/activate
-  
+
   # Launch training
   bash script/finetune/finetune_with_deepspeed.sh
