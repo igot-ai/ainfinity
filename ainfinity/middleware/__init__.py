@@ -1,6 +1,7 @@
 """
 Middleware package for application
 """
+
 from ainfinity.middleware.auth import AuthenticationMiddleware
 from ainfinity.middleware.cors import CORSMiddleware
 from ainfinity.middleware.logging import LoggingMiddleware

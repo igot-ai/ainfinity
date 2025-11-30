@@ -1,6 +1,7 @@
 """
 Main FastAPI application for AIFininity Training Service
 """
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,16 +9,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ainfinity.api.dependencies import get_training_service
 from ainfinity.api.v1 import api_router as api_v1_router
-from ainfinity.exceptions import (JobAlreadyExistsException,
-                                  JobNotFoundException, ServiceException,
-                                  ValidationException,
-                                  generic_exception_handler,
-                                  job_exists_handler, job_not_found_handler,
-                                  service_exception_handler,
-                                  validation_exception_handler,
-                                  value_error_handler)
-from ainfinity.middleware import (AuthenticationMiddleware, LoggingMiddleware,
-                                  RateLimitMiddleware)
+from ainfinity.exceptions import (
+    JobAlreadyExistsException,
+    JobNotFoundException,
+    ServiceException,
+    ValidationException,
+    generic_exception_handler,
+    job_exists_handler,
+    job_not_found_handler,
+    service_exception_handler,
+    validation_exception_handler,
+    value_error_handler,
+)
+from ainfinity.middleware import LoggingMiddleware
 from ainfinity.utils.config import serving_settings
 
 
@@ -41,7 +45,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
 
 # Add CORS middleware
@@ -85,16 +89,17 @@ async def root():
         "service": serving_settings.API_TITLE,
         "version": serving_settings.API_VERSION,
         "docs": "/docs",
-        "health": f"{serving_settings.API_V1_PREFIX}/health"
+        "health": f"{serving_settings.API_V1_PREFIX}/health",
     }
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "ainfinity.main:app",
         host=serving_settings.HOST,
         port=serving_settings.PORT,
         reload=serving_settings.RELOAD,
-        log_level=serving_settings.LOG_LEVEL.lower()
+        log_level=serving_settings.LOG_LEVEL.lower(),
     )

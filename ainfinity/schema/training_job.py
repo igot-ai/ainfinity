@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class JobStatus(str, Enum):
     """Status of a training job"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -17,6 +18,7 @@ class JobStatus(str, Enum):
 
 class InfraProvider(str, Enum):
     """Infrastructure provider options"""
+
     VAST = "vast"
     AWS = "aws"
     GCP = "gcp"
@@ -25,6 +27,7 @@ class InfraProvider(str, Enum):
 
 class ResourceConfig(BaseModel):
     """SkyPilot resource configuration"""
+
     infra: InfraProvider = Field(default=InfraProvider.VAST, description="Infrastructure provider")
     accelerators: str = Field(default="RTX3090:1", description="GPU type and count (e.g., RTX3090:1, A100:4)")
     disk_size: int = Field(default=100, ge=10, description="Disk size in GB")
@@ -35,6 +38,7 @@ class ResourceConfig(BaseModel):
 
 class TrainingConfig(BaseModel):
     """Training configuration"""
+
     config_file: str = Field(default="finetuning", description="Hydra config name (without .yaml)")
     dataset: Optional[str] = Field(default=None, description="Override dataset config")
     model: Optional[str] = Field(default=None, description="Override model config")
@@ -48,6 +52,7 @@ class TrainingConfig(BaseModel):
 
 class TrainingMetrics(BaseModel):
     """Training metrics during fine-tuning"""
+
     current_epoch: Optional[int] = Field(default=None, description="Current training epoch")
     total_epochs: Optional[int] = Field(default=None, description="Total number of epochs")
     current_step: Optional[int] = Field(default=None, description="Current training step")
@@ -61,6 +66,7 @@ class TrainingMetrics(BaseModel):
 
 class EvaluationMetrics(BaseModel):
     """Evaluation results"""
+
     eval_loss: Optional[float] = Field(default=None, description="Evaluation loss")
     eval_accuracy: Optional[float] = Field(default=None, description="Evaluation accuracy")
     eval_perplexity: Optional[float] = Field(default=None, description="Perplexity score")
@@ -70,6 +76,7 @@ class EvaluationMetrics(BaseModel):
 
 class GPUMetrics(BaseModel):
     """GPU utilization metrics"""
+
     gpu_utilization: Optional[float] = Field(default=None, ge=0, le=100, description="GPU utilization %")
     gpu_memory_used: Optional[float] = Field(default=None, description="GPU memory used (GB)")
     gpu_memory_total: Optional[float] = Field(default=None, description="Total GPU memory (GB)")
@@ -80,6 +87,7 @@ class GPUMetrics(BaseModel):
 
 class LaunchJobRequest(BaseModel):
     """Request to launch a training job"""
+
     job_name: str = Field(..., description="Unique name for the job", min_length=1, max_length=64)
     resources: ResourceConfig = Field(default_factory=ResourceConfig, description="Resource configuration")
     training: TrainingConfig = Field(default_factory=TrainingConfig, description="Training configuration")
@@ -89,6 +97,7 @@ class LaunchJobRequest(BaseModel):
 
 class JobInfo(BaseModel):
     """Information about a training job"""
+
     job_name: str
     cluster_name: str
     status: JobStatus
@@ -98,7 +107,7 @@ class JobInfo(BaseModel):
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     error_message: Optional[str] = None
-    
+
     # Metrics
     training_metrics: Optional[TrainingMetrics] = Field(default=None, description="Current training metrics")
     evaluation_metrics: Optional[EvaluationMetrics] = Field(default=None, description="Latest evaluation results")
@@ -107,6 +116,7 @@ class JobInfo(BaseModel):
 
 class JobResponse(BaseModel):
     """Response for job operations"""
+
     success: bool
     message: str
     job_info: Optional[JobInfo] = None
@@ -114,6 +124,7 @@ class JobResponse(BaseModel):
 
 class JobListResponse(BaseModel):
     """Response for listing jobs"""
+
     success: bool
     jobs: list[JobInfo]
     total: int

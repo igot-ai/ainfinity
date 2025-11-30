@@ -59,16 +59,16 @@ ainfinity/
   - `exceptions.py`: Custom exception hierarchy
   - `logging.py`: Logging utilities
   - `utils.py`: Common utility functions
-- **Nguyên tắc**: 
+- **Nguyên tắc**:
   - Không depend vào layer nào khác
   - Reusable trong toàn bộ application
 
 ### 2. **Service Layer** (`services/`)
 - **Trách nhiệm**: Business logic, external integrations
-- **Ví dụ**: 
+- **Ví dụ**:
   - `training_service.py`: Quản lý SkyPilot jobs
   - Future: `model_service.py`, `evaluation_service.py`
-- **Nguyên tắc**: 
+- **Nguyên tắc**:
   - Không depend vào API layer
   - Có thể test độc lập
   - Sử dụng exceptions từ core
@@ -98,7 +98,7 @@ ainfinity/
 - **Cấu trúc**:
   - `/api/v1/jobs` - Current version
   - `/api/v2/jobs` - Future version (khi cần)
-  
+
 ### 6. **Schema Layer** (`schema/`)
 - **Trách nhiệm**: Data validation, serialization
 - **Công nghệ**: Pydantic models
@@ -146,7 +146,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 class SkyPilotService:
     def __init__(self):
         self.jobs_db_path = ...  # Data storage
-    
+
     def _load_jobs_db(self):
         # Data access logic
 ```

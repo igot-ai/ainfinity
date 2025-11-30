@@ -66,7 +66,7 @@ docs/
 ### 2. **API Versioning** (`serving/api/v1/`)
 - **Endpoints**: `/api/v1/*`
 - **Benefit**: Backwards compatibility, easy upgrades
-- **Structure**: 
+- **Structure**:
   ```
   api/v1/endpoints/
     ├── jobs.py      # Current endpoints
@@ -231,15 +231,15 @@ def test_api_launch_job():
 1. **Authentication & Authorization**
    - JWT tokens
    - Role-based access control
-   
+
 2. **Database Integration**
    - SQLAlchemy models
    - Alembic migrations
-   
+
 3. **Async Operations**
    - Background tasks
    - WebSocket for real-time updates
-   
+
 4. **Monitoring & Logging**
    - Structured logging
    - Metrics collection

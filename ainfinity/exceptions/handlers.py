@@ -1,12 +1,16 @@
 """
 HTTP exception handlers for FastAPI
 """
+
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
-from ainfinity.exceptions.base import (JobAlreadyExistsException,
-                                       JobNotFoundException, ServiceException,
-                                       ValidationException)
+from ainfinity.exceptions.base import (
+    JobAlreadyExistsException,
+    JobNotFoundException,
+    ServiceException,
+    ValidationException,
+)
 
 
 async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
@@ -22,9 +26,7 @@ async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse
     )
 
 
-async def job_not_found_handler(
-    request: Request, exc: JobNotFoundException
-) -> JSONResponse:
+async def job_not_found_handler(request: Request, exc: JobNotFoundException) -> JSONResponse:
     """Handle JobNotFoundException"""
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -37,9 +39,7 @@ async def job_not_found_handler(
     )
 
 
-async def job_exists_handler(
-    request: Request, exc: JobAlreadyExistsException
-) -> JSONResponse:
+async def job_exists_handler(request: Request, exc: JobAlreadyExistsException) -> JSONResponse:
     """Handle JobAlreadyExistsException"""
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
@@ -52,9 +52,7 @@ async def job_exists_handler(
     )
 
 
-async def service_exception_handler(
-    request: Request, exc: ServiceException
-) -> JSONResponse:
+async def service_exception_handler(request: Request, exc: ServiceException) -> JSONResponse:
     """Handle ServiceException"""
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -67,9 +65,7 @@ async def service_exception_handler(
     )
 
 
-async def validation_exception_handler(
-    request: Request, exc: ValidationException
-) -> JSONResponse:
+async def validation_exception_handler(request: Request, exc: ValidationException) -> JSONResponse:
     """Handle ValidationException"""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

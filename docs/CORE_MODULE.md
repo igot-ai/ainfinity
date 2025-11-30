@@ -173,20 +173,20 @@ from ainfinity.core import (
 class TrainingService:
     def __init__(self):
         self.logger = get_logger(__name__)
-        
+
     def launch_job(self, request):
         jobs = load_json(self.jobs_db_path)
-        
+
         if request.job_name in jobs:
             raise JobAlreadyExistsException(
                 f"Job '{request.job_name}' already exists"
             )
-        
+
         # ... create job ...
-        
+
         jobs[request.job_name] = job_data
         save_json(jobs, self.jobs_db_path)
-        
+
         self.logger.info(f"Job '{request.job_name}' launched")
 ```
 
@@ -350,7 +350,7 @@ def test_sanitize_name():
 
 Core module cung cấp:
 - ✅ Centralized configuration
-- ✅ Custom exception hierarchy  
+- ✅ Custom exception hierarchy
 - ✅ Reusable utilities
 - ✅ Logging infrastructure
 - ✅ Application constants
