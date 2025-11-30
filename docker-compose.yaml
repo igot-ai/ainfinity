@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  ainfinity-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ainfinity-api
+    ports:
+      - "8000:8000"
+    environment:
+      # API Settings
+      - SERVING_API_TITLE=AIFininity Training Service
+      - SERVING_HOST=0.0.0.0
+      - SERVING_PORT=8000
+      - SERVING_RELOAD=false
+      - SERVING_LOG_LEVEL=INFO
+
+      # HuggingFace & WandB (set your tokens)
+      - HF_TOKEN=${HF_TOKEN}
+      - WANDB_API_KEY=${WANDB_API_KEY}
+
+      # Optional: Workspace root
+      - SERVING_WORKSPACE_ROOT=/app
+
+    volumes:
+      # Mount workspace data
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./.skypilot_jobs.json:/app/.skypilot_jobs.json
+
+      # Optional: Mount SkyPilot config if needed
+      - ~/.sky:/root/.sky:ro
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - ainfinity-network
+
+networks:
+  ainfinity-network:
+    driver: bridge
