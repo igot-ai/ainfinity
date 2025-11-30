@@ -4,7 +4,7 @@ from typing import Optional
 import torch
 from transformers import PreTrainedModel, TrainingArguments
 
-from ainfinity.config import settings
+from ainfinity.utils import settings
 
 
 @dataclass
