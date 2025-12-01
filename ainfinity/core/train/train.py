@@ -37,18 +37,10 @@ def parse_args():
         default="outputs",
         help="Output directory for checkpoints",
     )
-    parser.add_argument(
-        "--project_name", type=str, default="slm-finetuning", help="WandB project name"
-    )
-    parser.add_argument(
-        "--run_name", type=str, default="default-run", help="WandB run name"
-    )
-    parser.add_argument(
-        "--max_seq_length", type=int, default=2048, help="Max sequence length"
-    )
-    parser.add_argument(
-        "--epochs", type=int, default=1, help="Number of training epochs"
-    )
+    parser.add_argument("--project_name", type=str, default="slm-finetuning", help="WandB project name")
+    parser.add_argument("--run_name", type=str, default="default-run", help="WandB run name")
+    parser.add_argument("--max_seq_length", type=int, default=2048, help="Max sequence length")
+    parser.add_argument("--epochs", type=int, default=1, help="Number of training epochs")
     return parser.parse_args()
 
 
@@ -56,9 +48,7 @@ def main():
     args = parse_args()
 
     # 1. Initialize Monitoring
-    tracker = get_tracker(
-        project_name=args.project_name, run_name=args.run_name, config=vars(args)
-    )
+    tracker = get_tracker(project_name=args.project_name, run_name=args.run_name, config=vars(args))
 
     # 2. Load Model
     tracker.log_metrics({"status": "loading_model"}, step=0)
@@ -99,9 +89,7 @@ def main():
     # Assumes standard keys: instruction, context, response
     def formatting_prompts_func(examples):
         instructions = examples["instruction"]
-        inputs = examples.get(
-            "context", [""] * len(instructions)
-        )  # Handle missing context
+        inputs = examples.get("context", [""] * len(instructions))  # Handle missing context
         outputs = examples["response"]
         texts = []
         for instruction, input, output in zip(instructions, inputs, outputs):
@@ -224,27 +212,21 @@ def main():
                             # Update the specific model entry
                             if args.model_id in registry_data:
                                 registry_data[args.model_id]["status"] = "completed"
-                                registry_data[args.model_id]["artifact_path"] = (
-                                    os.path.abspath(model_save_path)
-                                )
+                                registry_data[args.model_id]["artifact_path"] = os.path.abspath(model_save_path)
 
                                 # Write back
                                 f.seek(0)
                                 f.truncate()
                                 json.dump(registry_data, f, indent=2)
 
-                                logger.info(
-                                    f"Updated registry for model {args.model_id}"
-                                )
+                                logger.info(f"Updated registry for model {args.model_id}")
                                 break
                         finally:
                             # Release lock
                             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
                 except (IOError, OSError):
                     if attempt < max_retries - 1:
-                        logger.warning(
-                            f"Registry lock attempt {attempt + 1} failed, retrying..."
-                        )
+                        logger.warning(f"Registry lock attempt {attempt + 1} failed, retrying...")
                         time.sleep(retry_delay)
                     else:
                         raise
