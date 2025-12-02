@@ -5,11 +5,10 @@ Jobs Router - Training job management endpoints
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ainfinity.api.dependencies import get_training_service
-from ainfinity.schema.training_job import JobListResponse, JobResponse, LaunchJobRequest
+from ainfinity.app.api.dependencies import get_training_service
+from ainfinity.app.schemas.training_job import JobListResponse, JobResponse, LaunchJobRequest
 
 router = APIRouter()
-
 
 @router.post("", response_model=JobResponse, status_code=201)
 async def launch_job(request: LaunchJobRequest):

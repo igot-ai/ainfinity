@@ -32,20 +32,20 @@ class ResourceConfig(BaseModel):
     accelerators: str = Field(default="RTX3090:1", description="GPU type and count (e.g., RTX3090:1, A100:4)")
     disk_size: int = Field(default=100, ge=10, description="Disk size in GB")
     image_id: str = Field(default="docker:nvidia/cuda:12.1.1-devel-ubuntu20.04", description="Docker image to use")
-    memory: Optional[str] = Field(default=None, description="Memory requirement (e.g., 32+)")
-    cpus: Optional[str] = Field(default=None, description="CPU requirement (e.g., 8+)")
+    memory: Optional[str] = Field(default="16+", description="Memory requirement (e.g., 32+)")
+    cpus: Optional[str] = Field(default="4+", description="CPU requirement (e.g., 8+)")
 
 
 class TrainingConfig(BaseModel):
     """Training configuration"""
 
     config_file: str = Field(default="finetuning", description="Hydra config name (without .yaml)")
-    dataset: Optional[str] = Field(default=None, description="Override dataset config")
-    model: Optional[str] = Field(default=None, description="Override model config")
-    num_train_epochs: Optional[int] = Field(default=None, ge=1, description="Number of training epochs")
-    per_device_train_batch_size: Optional[int] = Field(default=None, ge=1, description="Training batch size per device")
-    learning_rate: Optional[float] = Field(default=None, gt=0, description="Learning rate")
-    output_dir: Optional[str] = Field(default=None, description="Output directory for checkpoints")
+    dataset: str = Field(default="orca_chat", description="Dataset config name (without .yaml)")
+    model: str = Field(default="qwen3", description="Model config name (without .yaml)")
+    num_train_epochs: int = Field(default=1, ge=1, description="Number of training epochs")
+    per_device_train_batch_size: int = Field(default=4, ge=1, description="Training batch size per device")
+    learning_rate: float = Field(default=2e-5, gt=0, description="Learning rate")
+    output_dir: str = Field(default="./outputs/finetuning", description="Output directory for checkpoints")
     accelerate_config: str = Field(default="ds2_config.yaml", description="Accelerate config file name")
     extra_args: Optional[Dict[str, str]] = Field(default=None, description="Additional Hydra overrides")
 

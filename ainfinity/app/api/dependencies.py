@@ -3,7 +3,6 @@ Dependencies for FastAPI routes
 """
 
 from functools import lru_cache
-
 from ainfinity.services import SkyPilotService
 
 

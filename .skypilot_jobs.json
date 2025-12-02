@@ -1,1 +1,107 @@
-{}
+{
+  "string": {
+    "job_name": "string",
+    "cluster_name": "string",
+    "status": "pending",
+    "resources": {
+      "infra": "gcp",
+      "accelerators": "L4:1",
+      "disk_size": 100,
+      "image_id": "docker:nvidia/cuda:12.1.1-devel-ubuntu20.04",
+      "memory": "16+",
+      "cpus": "4+"
+    },
+    "training": {
+      "config_file": "finetuning",
+      "dataset": "orca_chat",
+      "model": "qwen3",
+      "num_train_epochs": 1,
+      "per_device_train_batch_size": 4,
+      "learning_rate": 2e-05,
+      "output_dir": "./outputs/finetuning",
+      "accelerate_config": "ds2_config.yaml",
+      "extra_args": {
+        "additionalProp1": "string",
+        "additionalProp2": "string",
+        "additionalProp3": "string"
+      }
+    },
+    "created_at": "2025-12-02T11:03:09.584854",
+    "started_at": null,
+    "ended_at": null,
+    "error_message": null,
+    "training_metrics": null,
+    "evaluation_metrics": null,
+    "gpu_metrics": null
+  },
+  "string2": {
+    "job_name": "string2",
+    "cluster_name": "string2",
+    "status": "pending",
+    "resources": {
+      "infra": "gcp",
+      "accelerators": "L4:1",
+      "disk_size": 100,
+      "image_id": "docker:nvidia/cuda:12.1.1-devel-ubuntu20.04",
+      "memory": "16+",
+      "cpus": "4+"
+    },
+    "training": {
+      "config_file": "finetuning",
+      "dataset": "orca_chat",
+      "model": "qwen3",
+      "num_train_epochs": 1,
+      "per_device_train_batch_size": 4,
+      "learning_rate": 2e-05,
+      "output_dir": "./outputs/finetuning",
+      "accelerate_config": "ds2_config.yaml",
+      "extra_args": {
+        "additionalProp1": "string",
+        "additionalProp2": "string",
+        "additionalProp3": "string"
+      }
+    },
+    "created_at": "2025-12-02T11:15:00.248419",
+    "started_at": null,
+    "ended_at": null,
+    "error_message": null,
+    "training_metrics": null,
+    "evaluation_metrics": null,
+    "gpu_metrics": null
+  },
+  "string3": {
+    "job_name": "string3",
+    "cluster_name": "string3",
+    "status": "pending",
+    "resources": {
+      "infra": "gcp",
+      "accelerators": "L4:1",
+      "disk_size": 100,
+      "image_id": "docker:nvidia/cuda:12.1.1-devel-ubuntu20.04",
+      "memory": "16+",
+      "cpus": "4+"
+    },
+    "training": {
+      "config_file": "finetuning",
+      "dataset": "orca_chat",
+      "model": "qwen3",
+      "num_train_epochs": 1,
+      "per_device_train_batch_size": 4,
+      "learning_rate": 2e-05,
+      "output_dir": "./outputs/finetuning",
+      "accelerate_config": "ds2_config.yaml",
+      "extra_args": {
+        "additionalProp1": "string",
+        "additionalProp2": "string",
+        "additionalProp3": "string"
+      }
+    },
+    "created_at": "2025-12-02T11:46:43.801970",
+    "started_at": null,
+    "ended_at": null,
+    "error_message": null,
+    "training_metrics": null,
+    "evaluation_metrics": null,
+    "gpu_metrics": null
+  }
+}

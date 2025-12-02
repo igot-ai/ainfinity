@@ -5,7 +5,7 @@ Health check endpoints
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
-from ainfinity.api.dependencies import get_training_service
+from ainfinity.app.api.dependencies import get_training_service
 from ainfinity.utils.config import serving_settings
 
 router = APIRouter()

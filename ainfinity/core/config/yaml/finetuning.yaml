@@ -35,5 +35,5 @@ training_arguments:
   overwrite_output_dir: true
   logging_strategy: steps
   seed: 0
-  push_to_hub: true
+  push_to_hub: false
   use_liger_kernel: true

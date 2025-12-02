@@ -5,17 +5,15 @@ venv/
 
 .idea/
 __pycache__/
+.skypilot_jobs.json
 
 
 *.pyc
 *.pyo
 *.pyd
 
-<<<<<<< HEAD
 logs/
 wandb/
 outputs/
-=======
 app/models/alembic.ini
 data/*
->>>>>>> 50dae73 (Modified project structure for further maintaining)

@@ -1,14 +1,16 @@
 import os
 import subprocess  # nosec B404
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml  # type: ignore[import-untyped]
+import yaml
+import json
 
-from ainfinity.exceptions import JobAlreadyExistsException
-from ainfinity.schema.training_job import (
+from ainfinity.app.exceptions import JobAlreadyExistsException
+from ainfinity.app.schemas.training_job import (
     EvaluationMetrics,
     GPUMetrics,
     JobInfo,
@@ -17,6 +19,21 @@ from ainfinity.schema.training_job import (
     TrainingMetrics,
 )
 from ainfinity.utils import load_json, save_json
+
+
+# Custom YAML representer for literal block scalars
+class literal_str(str):
+    """String subclass for YAML literal block scalar (|)"""
+    pass
+
+
+def literal_str_representer(dumper, data):
+    """Represent literal_str as YAML literal block scalar"""
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+
+
+# Register the custom representer
+yaml.add_representer(literal_str, literal_str_representer)
 
 
 class SkyPilotService:
@@ -50,24 +67,53 @@ class SkyPilotService:
         """Save jobs database"""
         save_json(jobs_db, self.jobs_db_path)
 
-    def _run_sky_command(self, cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:
+    def _run_sky_command(self, cmd: List[str], check: bool = True, capture_output: bool = True) -> subprocess.CompletedProcess:
         """
         Run a SkyPilot CLI command
 
         Args:
             cmd: Command as list of strings
             check: Whether to raise exception on non-zero exit code
+            capture_output: Whether to capture output (False for interactive commands like launch)
 
         Returns:
             CompletedProcess object
         """
+        print(f"Running SkyPilot command: {' '.join(cmd)}")
+        print("-" * 80)
+        
         try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, check=check, cwd=str(self.workspace_root)
-            )  # nosec B603
+            if capture_output:
+                # Capture output for parsing (used by status, logs, etc.)
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, check=check, cwd=str(self.workspace_root)
+                )  # nosec B603
+                
+                # Print captured output for visibility
+                if result.stdout:
+                    print(result.stdout)
+                if result.stderr:
+                    print(result.stderr, file=sys.stderr)
+            else:
+                # Stream output in real-time (used by launch)
+                result = subprocess.run(
+                    cmd, 
+                    text=True, 
+                    check=check, 
+                    cwd=str(self.workspace_root),
+                    stdout=None,  # Inherit parent's stdout
+                    stderr=None,  # Inherit parent's stderr
+                )  # nosec B603
+                
+            print("-" * 80)
             return result
+            
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"SkyPilot command failed: {e.stderr}") from e
+            error_msg = f"SkyPilot command failed with exit code {e.returncode}"
+            if hasattr(e, 'stderr') and e.stderr:
+                error_msg += f"\nError output: {e.stderr}"
+            print(f"ERROR: {error_msg}")
+            raise RuntimeError(error_msg) from e
 
     def _generate_yaml_config(self, request: LaunchJobRequest) -> str:
         """
@@ -79,12 +125,13 @@ class SkyPilotService:
         Returns:
             Path to generated YAML file
         """
+        print("Request sent to create YAML config:", request)
         # Build the run command with training configuration
         run_commands = ["source .venv/bin/activate", ""]
 
         # Build accelerate launch command
-        accelerate_config_path = f"./ainfinity/train/config/accelerate_config/{request.training.accelerate_config}"
-        python_file = "./ainfinity/train/finetune.py"
+        accelerate_config_path = f"./ainfinity/core/config/accelerate_config/{request.training.accelerate_config}"
+        python_file = "./ainfinity/core/finetune.py"
 
         cmd_parts = ["accelerate launch", f"--config_file {accelerate_config_path}", python_file]
 
@@ -105,10 +152,11 @@ class SkyPilotService:
         if request.training.output_dir:
             overrides.append(f"training_arguments.output_dir={request.training.output_dir}")
 
-        # Add extra arguments
-        if request.training.extra_args:
-            for key, value in request.training.extra_args.items():
-                overrides.append(f"{key}={value}")
+        # Temporary disabled extra arguments
+        # # Add extra arguments
+        # if request.training.extra_args:
+        #     for key, value in request.training.extra_args.items():
+        #         overrides.append(f"{key}={value}")
 
         if overrides:
             cmd_parts.extend(overrides)
@@ -116,8 +164,9 @@ class SkyPilotService:
         run_commands.append(" ".join(cmd_parts))
 
         # Create YAML configuration
+        
         resources_config: Dict[str, Any] = {
-            "infra": request.resources.infra,
+            "infra": request.resources.infra.value,  # Convert enum to string
             "accelerators": request.resources.accelerators,
             "disk_size": request.resources.disk_size,
             "image_id": request.resources.image_id,
@@ -129,17 +178,32 @@ class SkyPilotService:
         if request.resources.cpus:
             resources_config["cpus"] = request.resources.cpus
 
+        # Create setup and run scripts as literal block scalars (remove the " |" part!)
+        setup_script = literal_str(
+            "uv venv .venv --python=3.12\n"
+            "source .venv/bin/activate\n"
+            "uv sync --group gpu"
+        )
+        
+        run_script = literal_str("\n".join(run_commands))
+        
         config: Dict[str, Any] = {
             "name": request.job_name,
+            "envs": {
+                "WANDB_API_KEY": os.getenv("WANDB_API_KEY"),
+                "HF_TOKEN": os.getenv("HF_TOKEN"),
+            },
             "resources": resources_config,
             "workdir": ".",
-            "setup": "|\n  uv venv .venv --python=3.12\n  source .venv/bin/activate\n  uv sync --group gpu",
-            "run": "|\n  " + "\n  ".join(run_commands),
+            "setup": setup_script,
+            "run": run_script,
         }
 
+        print(f"YAML configuration: {json.dumps({k: v if not isinstance(v, literal_str) else str(v) for k, v in config.items()}, indent=4)}")
+        
         # Write to temporary file
         temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, dir=str(self.workspace_root))
-        yaml.dump(config, temp_file, default_flow_style=False, sort_keys=False)
+        yaml.dump(config, temp_file, default_flow_style=False, sort_keys=False, allow_unicode=True)
         temp_file.close()
 
         return temp_file.name
@@ -167,15 +231,15 @@ class SkyPilotService:
             cmd = ["sky", "launch", "-y"]
 
             if request.detach:
-                cmd.append("--detach-setup")
+                cmd.append("-d")
 
             if request.down:
                 cmd.append("--down")
 
             cmd.extend(["-c", request.job_name, yaml_path])
 
-            # Launch the job
-            self._run_sky_command(cmd)
+            # Launch the job (stream output in real-time)
+            self._run_sky_command(cmd, capture_output=False)
 
             # Create job info
             job_info = JobInfo(
@@ -187,6 +251,7 @@ class SkyPilotService:
                 created_at=datetime.now(),
             )
 
+            
             # Save to database
             jobs_db[request.job_name] = job_info.model_dump(mode="json")
             self._save_jobs_db(jobs_db)
@@ -264,7 +329,7 @@ class SkyPilotService:
 
         # Stop the cluster
         try:
-            self._run_sky_command(["sky", "down", "-y", job_name])
+            self._run_sky_command(["sky", "down", "-y", job_name], capture_output=False)
 
             # Update job info
             job_data = jobs_db[job_name]
