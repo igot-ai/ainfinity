@@ -17,11 +17,7 @@ from transformers import (
 from trl import DataCollatorForCompletionOnlyLM
 
 import wandb
-from ainfinity.core.helper import (
-    configure_hub_settings,
-    print_trainable_parameters,
-    select_torch_compute,
-)
+from ainfinity.core.helper import configure_hub_settings, print_trainable_parameters, select_torch_compute
 from ainfinity.utils import settings
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
