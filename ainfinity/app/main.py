@@ -7,10 +7,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from ainfinity.app.api.dependencies import get_training_service
-from ainfinity.app.api.v1 import api_router as api_v1_router
-
-from ainfinity.utils.config import serving_settings
 from ainfinity.app.api.setup import create_application
+from ainfinity.app.api.v1 import api_router as api_v1_router
+from ainfinity.utils.config import serving_settings
 
 
 @asynccontextmanager
@@ -26,6 +25,7 @@ async def lifespan(app: FastAPI):
 
 
 app = create_application(router=api_v1_router, lifespan=lifespan)
+
 
 @app.get("/", tags=["root"])
 async def root():

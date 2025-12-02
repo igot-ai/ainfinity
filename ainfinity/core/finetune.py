@@ -1,7 +1,6 @@
 import os
 
 import hydra
-import wandb
 from accelerate import Accelerator
 from datasets import load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
@@ -17,6 +16,7 @@ from transformers import (
 )
 from trl import DataCollatorForCompletionOnlyLM
 
+import wandb
 from ainfinity.core.helper import (
     configure_hub_settings,
     print_trainable_parameters,

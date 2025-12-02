@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess  # nosec B404
 import sys
@@ -6,8 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
-import json
+import yaml  # type: ignore
 
 from ainfinity.app.exceptions import JobAlreadyExistsException
 from ainfinity.app.schemas.training_job import (
@@ -24,12 +24,11 @@ from ainfinity.utils import load_json, save_json
 # Custom YAML representer for literal block scalars
 class literal_str(str):
     """String subclass for YAML literal block scalar (|)"""
-    pass
 
 
 def literal_str_representer(dumper, data):
     """Represent literal_str as YAML literal block scalar"""
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 
 
 # Register the custom representer
@@ -67,7 +66,9 @@ class SkyPilotService:
         """Save jobs database"""
         save_json(jobs_db, self.jobs_db_path)
 
-    def _run_sky_command(self, cmd: List[str], check: bool = True, capture_output: bool = True) -> subprocess.CompletedProcess:
+    def _run_sky_command(
+        self, cmd: List[str], check: bool = True, capture_output: bool = True
+    ) -> subprocess.CompletedProcess:
         """
         Run a SkyPilot CLI command
 
@@ -81,14 +82,14 @@ class SkyPilotService:
         """
         print(f"Running SkyPilot command: {' '.join(cmd)}")
         print("-" * 80)
-        
+
         try:
             if capture_output:
                 # Capture output for parsing (used by status, logs, etc.)
                 result = subprocess.run(
                     cmd, capture_output=True, text=True, check=check, cwd=str(self.workspace_root)
                 )  # nosec B603
-                
+
                 # Print captured output for visibility
                 if result.stdout:
                     print(result.stdout)
@@ -97,20 +98,20 @@ class SkyPilotService:
             else:
                 # Stream output in real-time (used by launch)
                 result = subprocess.run(
-                    cmd, 
-                    text=True, 
-                    check=check, 
+                    cmd,
+                    text=True,
+                    check=check,
                     cwd=str(self.workspace_root),
                     stdout=None,  # Inherit parent's stdout
                     stderr=None,  # Inherit parent's stderr
                 )  # nosec B603
-                
+
             print("-" * 80)
             return result
-            
+
         except subprocess.CalledProcessError as e:
             error_msg = f"SkyPilot command failed with exit code {e.returncode}"
-            if hasattr(e, 'stderr') and e.stderr:
+            if hasattr(e, "stderr") and e.stderr:
                 error_msg += f"\nError output: {e.stderr}"
             print(f"ERROR: {error_msg}")
             raise RuntimeError(error_msg) from e
@@ -164,7 +165,7 @@ class SkyPilotService:
         run_commands.append(" ".join(cmd_parts))
 
         # Create YAML configuration
-        
+
         resources_config: Dict[str, Any] = {
             "infra": request.resources.infra.value,  # Convert enum to string
             "accelerators": request.resources.accelerators,
@@ -179,14 +180,10 @@ class SkyPilotService:
             resources_config["cpus"] = request.resources.cpus
 
         # Create setup and run scripts as literal block scalars (remove the " |" part!)
-        setup_script = literal_str(
-            "uv venv .venv --python=3.12\n"
-            "source .venv/bin/activate\n"
-            "uv sync --group gpu"
-        )
-        
+        setup_script = literal_str("uv venv .venv --python=3.12\n" "source .venv/bin/activate\n" "uv sync --group gpu")
+
         run_script = literal_str("\n".join(run_commands))
-        
+
         config: Dict[str, Any] = {
             "name": request.job_name,
             "envs": {
@@ -199,8 +196,9 @@ class SkyPilotService:
             "run": run_script,
         }
 
-        print(f"YAML configuration: {json.dumps({k: v if not isinstance(v, literal_str) else str(v) for k, v in config.items()}, indent=4)}")
-        
+        yaml_dict = {k: v if not isinstance(v, literal_str) else str(v) for k, v in config.items()}
+        print(f"YAML configuration: {json.dumps(yaml_dict, indent=4)}")
+
         # Write to temporary file
         temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, dir=str(self.workspace_root))
         yaml.dump(config, temp_file, default_flow_style=False, sort_keys=False, allow_unicode=True)
@@ -251,7 +249,6 @@ class SkyPilotService:
                 created_at=datetime.now(),
             )
 
-            
             # Save to database
             jobs_db[request.job_name] = job_info.model_dump(mode="json")
             self._save_jobs_db(jobs_db)

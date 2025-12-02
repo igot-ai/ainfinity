@@ -1,8 +1,8 @@
-from fastapi import FastAPI
+from collections.abc import Callable
 from contextlib import _AsyncGeneratorContextManager
 from typing import Any
-from collections.abc import Callable
 
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ainfinity.app.api.v1 import api_router as api_v1_router
@@ -19,9 +19,7 @@ from ainfinity.app.exceptions import (
     value_error_handler,
 )
 from ainfinity.app.middleware import LoggingMiddleware
-
 from ainfinity.utils.config import serving_settings
-from fastapi import APIRouter
 
 
 def create_application(

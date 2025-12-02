@@ -10,6 +10,7 @@ from ainfinity.app.schemas.training_job import JobListResponse, JobResponse, Lau
 
 router = APIRouter()
 
+
 @router.post("", response_model=JobResponse, status_code=201)
 async def launch_job(request: LaunchJobRequest):
     """
