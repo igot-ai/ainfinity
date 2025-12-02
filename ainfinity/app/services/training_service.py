@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import yaml  # type: ignore
 
 from ainfinity.app.exceptions import JobAlreadyExistsException
-from ainfinity.app.schemas.training_job import (
+from ainfinity.app.schemas import (
     EvaluationMetrics,
     GPUMetrics,
     JobInfo,
@@ -46,7 +46,9 @@ class SkyPilotService:
             workspace_root: Root directory of the workspace. If None, uses current directory.
         """
         self.workspace_root = Path(workspace_root) if workspace_root else Path.cwd()
-        self.template_path = self.workspace_root / "ainfinity" / "skylaunch" / "deepspeed.yaml"
+        self.template_path = (
+            self.workspace_root / "ainfinity" / "skylaunch" / "deepspeed.yaml"
+        )
         self.jobs_db_path = self.workspace_root / ".skypilot_jobs.json"
         self._ensure_jobs_db()
 
@@ -87,7 +89,11 @@ class SkyPilotService:
             if capture_output:
                 # Capture output for parsing (used by status, logs, etc.)
                 result = subprocess.run(
-                    cmd, capture_output=True, text=True, check=check, cwd=str(self.workspace_root)
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=check,
+                    cwd=str(self.workspace_root),
                 )  # nosec B603
 
                 # Print captured output for visibility
@@ -134,7 +140,11 @@ class SkyPilotService:
         accelerate_config_path = f"./ainfinity/core/config/accelerate_config/{request.training.accelerate_config}"
         python_file = "./ainfinity/core/finetune.py"
 
-        cmd_parts = ["accelerate launch", f"--config_file {accelerate_config_path}", python_file]
+        cmd_parts = [
+            "accelerate launch",
+            f"--config_file {accelerate_config_path}",
+            python_file,
+        ]
 
         # Add Hydra config overrides
         overrides = []
@@ -143,15 +153,21 @@ class SkyPilotService:
         if request.training.model:
             overrides.append(f"model={request.training.model}")
         if request.training.num_train_epochs:
-            overrides.append(f"training_arguments.num_train_epochs={request.training.num_train_epochs}")
+            overrides.append(
+                f"training_arguments.num_train_epochs={request.training.num_train_epochs}"
+            )
         if request.training.per_device_train_batch_size:
             overrides.append(
                 f"training_arguments.per_device_train_batch_size={request.training.per_device_train_batch_size}"
             )
         if request.training.learning_rate:
-            overrides.append(f"training_arguments.learning_rate={request.training.learning_rate}")
+            overrides.append(
+                f"training_arguments.learning_rate={request.training.learning_rate}"
+            )
         if request.training.output_dir:
-            overrides.append(f"training_arguments.output_dir={request.training.output_dir}")
+            overrides.append(
+                f"training_arguments.output_dir={request.training.output_dir}"
+            )
 
         # Temporary disabled extra arguments
         # # Add extra arguments
@@ -180,7 +196,11 @@ class SkyPilotService:
             resources_config["cpus"] = request.resources.cpus
 
         # Create setup and run scripts as literal block scalars (remove the " |" part!)
-        setup_script = literal_str("uv venv .venv --python=3.12\n" "source .venv/bin/activate\n" "uv sync --group gpu")
+        setup_script = literal_str(
+            "uv venv .venv --python=3.12\n"
+            "source .venv/bin/activate\n"
+            "uv sync --group gpu"
+        )
 
         run_script = literal_str("\n".join(run_commands))
 
@@ -196,12 +216,23 @@ class SkyPilotService:
             "run": run_script,
         }
 
-        yaml_dict = {k: v if not isinstance(v, literal_str) else str(v) for k, v in config.items()}
+        yaml_dict = {
+            k: v if not isinstance(v, literal_str) else str(v)
+            for k, v in config.items()
+        }
         print(f"YAML configuration: {json.dumps(yaml_dict, indent=4)}")
 
         # Write to temporary file
-        temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, dir=str(self.workspace_root))
-        yaml.dump(config, temp_file, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        temp_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, dir=str(self.workspace_root)
+        )
+        yaml.dump(
+            config,
+            temp_file,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        )
         temp_file.close()
 
         return temp_file.name
@@ -219,7 +250,9 @@ class SkyPilotService:
         # Check if job name already exists
         jobs_db = self._load_jobs_db()
         if request.job_name in jobs_db:
-            raise JobAlreadyExistsException(f"Job with name '{request.job_name}' already exists")
+            raise JobAlreadyExistsException(
+                f"Job with name '{request.job_name}' already exists"
+            )
 
         # Generate YAML configuration
         yaml_path = self._generate_yaml_config(request)
@@ -381,7 +414,9 @@ class SkyPilotService:
 
         try:
             # Get logs using sky logs command
-            result = self._run_sky_command(["sky", "logs", job_name, "--tail", str(tail)], check=False)
+            result = self._run_sky_command(
+                ["sky", "logs", job_name, "--tail", str(tail)], check=False
+            )
             return result.stdout
         except Exception as e:
             return f"Error retrieving logs: {str(e)}"
@@ -484,7 +519,9 @@ class SkyPilotService:
                 metrics.eval_accuracy = float(eval_acc_match.group(1))
 
             # Parse perplexity
-            perplexity_match = re.search(r"'eval_(?:runtime_)?perplexity':\s*([\d.]+)", logs)
+            perplexity_match = re.search(
+                r"'eval_(?:runtime_)?perplexity':\s*([\d.]+)", logs
+            )
             if perplexity_match:
                 metrics.eval_perplexity = float(perplexity_match.group(1))
 
