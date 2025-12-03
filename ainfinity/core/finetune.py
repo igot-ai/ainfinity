@@ -101,7 +101,7 @@ def load_hf_dataset(dataset_args: DictConfig) -> DatasetDict:
     dataset = load_dataset(
         dataset_args.name,
         split=None,
-        revision=dataset_args.get("revision", None),  # Load all splits
+        revision=dataset_args.get("revision", None),
     )
 
     # Prepare final splits according to config
