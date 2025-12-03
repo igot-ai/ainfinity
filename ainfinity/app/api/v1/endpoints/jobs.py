@@ -6,13 +6,13 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from ainfinity.app.api.dependencies import get_training_service
-from ainfinity.app.schemas import JobListResponse, JobResponse, LaunchJobRequest
+from ainfinity.app.schemas import JobListResponse, JobResponse, TrainingJobRequest
 
 router = APIRouter()
 
 
 @router.post("", response_model=JobResponse, status_code=201)
-async def launch_job(request: LaunchJobRequest):
+async def launch_job(request: TrainingJobRequest):
     """
     Launch a new training job
 

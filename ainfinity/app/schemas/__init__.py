@@ -7,7 +7,7 @@ from .base import AttnImpl, EvalStrategy, InfraProvider, JobStatus, SaveStrategy
 from .metrics import EvaluationMetrics, GPUMetrics, TrainingMetrics
 
 # Request schemas
-from .request import LaunchJobRequest, TrainingRequest
+from .request import TrainingJobRequest
 
 # Resource schemas
 from .resource import ResourceConfig
@@ -16,7 +16,7 @@ from .resource import ResourceConfig
 from .response import JobInfo, JobListResponse, JobResponse
 
 # Training configuration schemas
-from .training import DatasetInfo, DatasetSplit, LrScheduler, ModelInfo, TrainingParams
+from .training import DatasetInfo, DatasetSplit, ModelInfo, TrainingParams
 
 __all__ = [
     # Base enums
@@ -30,13 +30,11 @@ __all__ = [
     "ModelInfo",
     "DatasetInfo",
     "DatasetSplit",
-    "LrScheduler",
     "TrainingParams",
     # Resources
     "ResourceConfig",
     # Requests
-    "LaunchJobRequest",
-    "TrainingRequest",
+    "TrainingJobRequest",
     # Responses
     "JobInfo",
     "JobResponse",

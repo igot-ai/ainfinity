@@ -15,7 +15,7 @@ from ainfinity.app.schemas import (
     GPUMetrics,
     JobInfo,
     JobStatus,
-    LaunchJobRequest,
+    TrainingJobRequest,
     TrainingMetrics,
 )
 from ainfinity.utils import load_json, save_json
@@ -46,9 +46,7 @@ class SkyPilotService:
             workspace_root: Root directory of the workspace. If None, uses current directory.
         """
         self.workspace_root = Path(workspace_root) if workspace_root else Path.cwd()
-        self.template_path = (
-            self.workspace_root / "ainfinity" / "skylaunch" / "deepspeed.yaml"
-        )
+        self.template_path = self.workspace_root / "ainfinity" / "skylaunch" / "deepspeed.yaml"
         self.jobs_db_path = self.workspace_root / ".skypilot_jobs.json"
         self._ensure_jobs_db()
 
@@ -122,7 +120,7 @@ class SkyPilotService:
             print(f"ERROR: {error_msg}")
             raise RuntimeError(error_msg) from e
 
-    def _generate_yaml_config(self, request: LaunchJobRequest) -> str:
+    def _generate_yaml_config(self, request: TrainingJobRequest) -> str:
         """
         Generate SkyPilot YAML configuration from request
 
@@ -136,73 +134,98 @@ class SkyPilotService:
         # Build the run command with training configuration
         run_commands = ["source .venv/bin/activate", ""]
 
-        # Build accelerate launch command
-        accelerate_config_path = f"./ainfinity/core/config/accelerate_config/{request.training.accelerate_config}"
+        # Create Hydra training config YAML file
+        training_config = {
+            "model": request.model.model_dump(mode="json"),
+            "dataset": request.dataset.model_dump(mode="json"),
+            "training_arguments": {
+                "output_dir": request.training_params.output_dir,
+                "num_train_epochs": request.training_params.num_train_epochs,
+                "per_device_train_batch_size": request.training_params.per_device_train_batch_size,
+                "per_device_eval_batch_size": request.training_params.per_device_eval_batch_size,
+                "eval_strategy": request.training_params.eval_strategy.value,
+                "save_strategy": request.training_params.save_strategy.value,
+                "gradient_accumulation_steps": request.training_params.gradient_accumulation_steps,
+                "learning_rate": request.training_params.learning_rate,
+                "lr_scheduler_type": request.training_params.lr_scheduler_type.value,
+                "warmup_steps": request.training_params.warmup_steps,
+                "warmup_ratio": request.training_params.warmup_ratio,
+                "bf16": request.training_params.bf16,
+                "fp16": request.training_params.fp16,
+                "logging_steps": request.training_params.logging_steps,
+                "save_steps": request.training_params.save_steps,
+                "eval_steps": request.training_params.eval_steps,
+            },
+            "seed": request.training_params.seed,
+        }
+
+        # Write Hydra config to YAML
+        config_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".yaml",
+            delete=False,
+            dir=tempfile.gettempdir(),
+            prefix=f"hydra_config_{request.job_name}_",
+        )
+        yaml.dump(training_config, config_file, default_flow_style=False, sort_keys=False)
+        config_file.close()
+
+        # # Debug: Print training config YAML
+        # print(f"\n{'='*80}")
+        # print(f"Training Config YAML (Hydra): {config_file.name}")
+        # print(f"{'='*80}")
+        # print(
+        #     yaml.dump(
+        #         training_config,
+        #         default_flow_style=False,
+        #         sort_keys=False,
+        #         allow_unicode=True,
+        #     )
+        # )
+        # print(f"{'='*80}\n")
+
+        # Build accelerate launch command (run with Hydra config override)
+        accelerate_config_path = "./ainfinity/core/config/accelerate_config/ds2_config.yaml"
         python_file = "./ainfinity/core/finetune.py"
+
+        # Path to config file on remote cluster (always /tmp on Linux clusters)
+        remote_config_path = f"/tmp/hydra_override_{request.job_name}.yaml"  # nosec B108
 
         cmd_parts = [
             "accelerate launch",
             f"--config_file {accelerate_config_path}",
             python_file,
+            "--config-dir /tmp",
+            f"--config-name {Path(remote_config_path).stem}",
         ]
-
-        # Add Hydra config overrides
-        overrides = []
-        if request.training.dataset:
-            overrides.append(f"dataset={request.training.dataset}")
-        if request.training.model:
-            overrides.append(f"model={request.training.model}")
-        if request.training.num_train_epochs:
-            overrides.append(
-                f"training_arguments.num_train_epochs={request.training.num_train_epochs}"
-            )
-        if request.training.per_device_train_batch_size:
-            overrides.append(
-                f"training_arguments.per_device_train_batch_size={request.training.per_device_train_batch_size}"
-            )
-        if request.training.learning_rate:
-            overrides.append(
-                f"training_arguments.learning_rate={request.training.learning_rate}"
-            )
-        if request.training.output_dir:
-            overrides.append(
-                f"training_arguments.output_dir={request.training.output_dir}"
-            )
-
-        # Temporary disabled extra arguments
-        # # Add extra arguments
-        # if request.training.extra_args:
-        #     for key, value in request.training.extra_args.items():
-        #         overrides.append(f"{key}={value}")
-
-        if overrides:
-            cmd_parts.extend(overrides)
 
         run_commands.append(" ".join(cmd_parts))
 
         # Create YAML configuration
 
-        resources_config: Dict[str, Any] = {
-            "infra": request.resources.infra.value,  # Convert enum to string
-            "accelerators": request.resources.accelerators,
-            "disk_size": request.resources.disk_size,
-            "image_id": request.resources.image_id,
+        resource_config: Dict[str, Any] = {
+            "cloud": request.resource.infra.value,  # Convert enum to string
+            "accelerators": request.resource.accelerators,
+            "disk_size": request.resource.disk_size,
         }
 
         # Add optional resource fields
-        if request.resources.memory:
-            resources_config["memory"] = request.resources.memory
-        if request.resources.cpus:
-            resources_config["cpus"] = request.resources.cpus
+        if request.resource.image_id:
+            resource_config["image_id"] = request.resource.image_id
+        if request.resource.memory:
+            resource_config["memory"] = request.resource.memory
+        if request.resource.cpus:
+            resource_config["cpus"] = request.resource.cpus
 
         # Create setup and run scripts as literal block scalars (remove the " |" part!)
-        setup_script = literal_str(
-            "uv venv .venv --python=3.12\n"
-            "source .venv/bin/activate\n"
-            "uv sync --group gpu"
-        )
+        setup_script = literal_str("uv venv .venv --python=3.12\n" "source .venv/bin/activate\n" "uv sync --group gpu")
 
         run_script = literal_str("\n".join(run_commands))
+
+        # Mount the training config file to the cluster
+        file_mounts = {
+            remote_config_path: config_file.name,
+        }
 
         config: Dict[str, Any] = {
             "name": request.job_name,
@@ -210,21 +233,23 @@ class SkyPilotService:
                 "WANDB_API_KEY": os.getenv("WANDB_API_KEY"),
                 "HF_TOKEN": os.getenv("HF_TOKEN"),
             },
-            "resources": resources_config,
+            "resources": resource_config,
             "workdir": ".",
+            "file_mounts": file_mounts,
             "setup": setup_script,
             "run": run_script,
         }
 
-        yaml_dict = {
-            k: v if not isinstance(v, literal_str) else str(v)
-            for k, v in config.items()
-        }
+        yaml_dict = {k: v if not isinstance(v, literal_str) else str(v) for k, v in config.items()}
         print(f"YAML configuration: {json.dumps(yaml_dict, indent=4)}")
 
         # Write to temporary file
         temp_file = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False, dir=str(self.workspace_root)
+            mode="w",
+            suffix=".yaml",
+            delete=False,
+            dir=tempfile.gettempdir(),
+            prefix=f"skypilot_task_{request.job_name}_",
         )
         yaml.dump(
             config,
@@ -237,7 +262,7 @@ class SkyPilotService:
 
         return temp_file.name
 
-    def launch_job(self, request: LaunchJobRequest) -> JobInfo:
+    def launch_job(self, request: TrainingJobRequest) -> JobInfo:
         """
         Launch a training job with SkyPilot
 
@@ -250,9 +275,7 @@ class SkyPilotService:
         # Check if job name already exists
         jobs_db = self._load_jobs_db()
         if request.job_name in jobs_db:
-            raise JobAlreadyExistsException(
-                f"Job with name '{request.job_name}' already exists"
-            )
+            raise JobAlreadyExistsException(f"Job with name '{request.job_name}' already exists")
 
         # Generate YAML configuration
         yaml_path = self._generate_yaml_config(request)
@@ -272,13 +295,21 @@ class SkyPilotService:
             # Launch the job (stream output in real-time)
             self._run_sky_command(cmd, capture_output=False)
 
-            # Create job info
+            # Create job info - store training config from request
+
+            # Create a TrainingRequest-like dict for backward compatibility with JobInfo
+            training_snapshot = {
+                "model": request.model.model_dump(mode="json"),
+                "dataset": request.dataset.model_dump(mode="json"),
+                "training_args": request.training_params.model_dump(mode="json"),
+            }
+
             job_info = JobInfo(
                 job_name=request.job_name,
                 cluster_name=request.job_name,
                 status=JobStatus.PENDING,
-                resources=request.resources,
-                training=request.training,
+                resource=request.resource,
+                training=training_snapshot,
                 created_at=datetime.now(),
             )
 
@@ -289,9 +320,17 @@ class SkyPilotService:
             return job_info
 
         finally:
-            # Clean up temporary YAML file
+            # Clean up temporary files
             try:
                 os.unlink(yaml_path)
+            except OSError:
+                pass
+
+            # Clean up config file if it was created in _generate_yaml_config
+            try:
+                # Find and remove the config file created in _generate_yaml_config
+                for f in Path(self.workspace_root).glob(f"config_{request.job_name}_*.json"):
+                    os.unlink(f)
             except OSError:
                 pass
 
@@ -414,9 +453,7 @@ class SkyPilotService:
 
         try:
             # Get logs using sky logs command
-            result = self._run_sky_command(
-                ["sky", "logs", job_name, "--tail", str(tail)], check=False
-            )
+            result = self._run_sky_command(["sky", "logs", job_name, "--tail", str(tail)], check=False)
             return result.stdout
         except Exception as e:
             return f"Error retrieving logs: {str(e)}"
@@ -519,9 +556,7 @@ class SkyPilotService:
                 metrics.eval_accuracy = float(eval_acc_match.group(1))
 
             # Parse perplexity
-            perplexity_match = re.search(
-                r"'eval_(?:runtime_)?perplexity':\s*([\d.]+)", logs
-            )
+            perplexity_match = re.search(r"'eval_(?:runtime_)?perplexity':\s*([\d.]+)", logs)
             if perplexity_match:
                 metrics.eval_perplexity = float(perplexity_match.group(1))
 

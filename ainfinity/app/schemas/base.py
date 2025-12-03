@@ -29,7 +29,6 @@ class AttnImpl(str, Enum):
     FLASH_ATTENTION = "flash_attention_2"
     SPDA = "sdpa"
     EAGER = "eager"
-    AUTO = "auto"
 
 
 class SchedulerType(str, Enum):

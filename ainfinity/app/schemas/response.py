@@ -1,13 +1,12 @@
 """API response schemas"""
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
 from .base import JobStatus
 from .metrics import EvaluationMetrics, GPUMetrics, TrainingMetrics
-from .request import TrainingRequest
 from .resource import ResourceConfig
 
 
@@ -17,23 +16,20 @@ class JobInfo(BaseModel):
     job_name: str
     cluster_name: str
     status: JobStatus
-    resources: ResourceConfig
-    training: TrainingRequest
+    resource: ResourceConfig
+    training: Dict[str, Any] = Field(
+        ...,
+        description="Training configuration snapshot (model, dataset, training_args)",
+    )
     created_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     error_message: Optional[str] = None
 
     # Metrics
-    training_metrics: Optional[TrainingMetrics] = Field(
-        default=None, description="Current training metrics"
-    )
-    evaluation_metrics: Optional[EvaluationMetrics] = Field(
-        default=None, description="Latest evaluation results"
-    )
-    gpu_metrics: Optional[GPUMetrics] = Field(
-        default=None, description="GPU utilization metrics"
-    )
+    training_metrics: Optional[TrainingMetrics] = Field(default=None, description="Current training metrics")
+    evaluation_metrics: Optional[EvaluationMetrics] = Field(default=None, description="Latest evaluation results")
+    gpu_metrics: Optional[GPUMetrics] = Field(default=None, description="GPU utilization metrics")
 
 
 class JobResponse(BaseModel):
