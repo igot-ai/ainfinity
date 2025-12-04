@@ -135,9 +135,11 @@ class SkyPilotService:
         run_commands = ["source .venv/bin/activate", ""]
 
         # Create Hydra training config YAML file
+        dataset_config = request.dataset.model_dump(mode="json")
+
         training_config = {
             "model": request.model.model_dump(mode="json"),
-            "dataset": request.dataset.model_dump(mode="json"),
+            "dataset": dataset_config,
             "training_arguments": {
                 "output_dir": request.training_params.output_dir,
                 "num_train_epochs": request.training_params.num_train_epochs,

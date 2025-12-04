@@ -1,9 +1,11 @@
 import os
+from typing import Dict, List
 
 import hydra
+import requests
 import wandb
 from accelerate import Accelerator
-from datasets import load_dataset, load_from_disk
+from datasets import Dataset, load_dataset, load_from_disk
 from datasets.dataset_dict import DatasetDict
 from omegaconf import DictConfig
 from transformers import (
@@ -88,6 +90,66 @@ def load_model(
     return model
 
 
+def load_datalog_dataset(dataset_args: DictConfig) -> DatasetDict:
+    """
+    Load datalog dataset from URLs according to YAML config.
+    Always returns a DatasetDict with 'train' and 'validation' splits.
+
+    Supports:
+    - schema_type: conversation, text_generation, etc.
+    - urls: list of URLs to download JSONL files
+    - shuffle: whether to shuffle the combined dataset
+    - train_eval_split: ratio for train/validation split (default 0.8)
+    - train_max_samples: max samples for training set
+    - validation_max_samples: max samples for validation set
+    """
+    import json
+
+    print(f"Loading datalog dataset from {len(dataset_args.urls)} URLs...")
+
+    # Download and parse JSONL files from URLs
+    all_examples: List[Dict] = []
+    for url in dataset_args.urls:
+        print(f"Downloading from: {url}")
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+
+        # Parse JSONL
+        for line in response.text.strip().split("\n"):
+            if line.strip():
+                example = json.loads(line)
+                all_examples.append(example)
+
+    print(f"Loaded {len(all_examples)} examples total")
+
+    # Create dataset from examples
+    dataset = Dataset.from_list(all_examples)
+
+    # Shuffle if requested
+    if dataset_args.get("shuffle", True):
+        dataset = dataset.shuffle(seed=42)
+
+    # Split into train/validation
+    train_eval_split = dataset_args.get("train_eval_split", 0.8)
+    split_dataset = dataset.train_test_split(train_size=train_eval_split, seed=42)
+
+    train_dataset = split_dataset["train"]
+    validation_dataset = split_dataset["test"]
+
+    # Limit samples if requested
+    train_max_samples = dataset_args.get("train_max_samples", None)
+    if train_max_samples is not None and train_max_samples < len(train_dataset):
+        train_dataset = train_dataset.select(range(train_max_samples))
+
+    validation_max_samples = dataset_args.get("validation_max_samples", None)
+    if validation_max_samples is not None and validation_max_samples < len(validation_dataset):
+        validation_dataset = validation_dataset.select(range(validation_max_samples))
+
+    print(f"Train samples: {len(train_dataset)}, Validation samples: {len(validation_dataset)}")
+
+    return DatasetDict({"train": train_dataset, "validation": validation_dataset})
+
+
 def load_hf_dataset(dataset_args: DictConfig) -> DatasetDict:
     """
     Load HuggingFace dataset according to YAML config.
@@ -130,6 +192,26 @@ def load_hf_dataset(dataset_args: DictConfig) -> DatasetDict:
     return dataset_dict
 
 
+def load_dataset_wrapper(dataset_args: DictConfig) -> tuple[DatasetDict, str]:
+    """
+    Unified dataset loader that routes to appropriate loader based on source.
+    Returns (dataset, text_column_name)
+    """
+    # DataSource enum values from YAML: "datalog" or "huggingface"
+    source = dataset_args.get("source", "huggingface")
+
+    if source == "datalog":  # DataSource.DATALOG.value
+        print("Loading from datalog source...")
+        dataset = load_datalog_dataset(dataset_args)
+        text_col = "messages"  # Datalog uses 'messages' field for conversation format
+    else:  # DataSource.HUGGINGFACE.value or default
+        print("Loading from HuggingFace source...")
+        dataset = load_hf_dataset(dataset_args)
+        text_col = dataset_args.text_col
+
+    return dataset, text_col
+
+
 @hydra.main(config_path="config/yaml", config_name="finetuning", version_base=None)
 def main(config: DictConfig):
     accelerator = Accelerator()
@@ -151,14 +233,14 @@ def main(config: DictConfig):
     model_cached_dir = model_args.get("cache_dir", "./model_cache_dir")
 
     if accelerator.is_main_process:
-        dataset = load_hf_dataset(dataset_args)
+        dataset, text_col = load_dataset_wrapper(dataset_args)
 
         tokenizer = load_tokenizer(model_args)
         model = load_model(model_args, config.training_arguments, tokenizer)
 
         def apply_chat_template(example):
             output = tokenizer.apply_chat_template(
-                example[dataset_args.text_col],
+                example[text_col],
                 add_generation_prompt=False,
                 tokenize=True,
                 enable_thinking=False,
@@ -193,11 +275,20 @@ def main(config: DictConfig):
         mlm=False,
     )
 
+    # Get train/validation datasets based on source
+    source = dataset_args.get("source", "huggingface")
+    if source == "datalog":  # DataSource.DATALOG.value
+        train_dataset = formated_dataset["train"]
+        eval_dataset = formated_dataset["validation"]
+    else:  # DataSource.HUGGINGFACE.value or default
+        train_dataset = formated_dataset[dataset_args.split.train.name]
+        eval_dataset = formated_dataset[dataset_args.split.validation.name]
+
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=formated_dataset[dataset_args.split.train.name],
-        eval_dataset=formated_dataset[dataset_args.split.validation.name],
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         data_collator=collator,
         tokenizer=tokenizer,
     )

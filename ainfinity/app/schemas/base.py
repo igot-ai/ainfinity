@@ -53,3 +53,20 @@ class SaveStrategy(str, Enum):
     NO = "no"
     STEPS = "steps"
     EPOCH = "epoch"
+
+
+class DatalogSchema(str, Enum):
+    """Dataset schema types"""
+
+    CONVERSATION = "conversation"
+    TEXT_GENERATION = "text_generation"
+    TEXT_CLASSIFICATION = "text_classification"
+    PREFERENCE_RANKING = "preference_ranking"
+    ENTITY_RELATIONSHIP_EXTRACTION = "entity_relationship_extraction"
+
+
+class DataSource(str, Enum):
+    """Data source types"""
+
+    DATALOG = "datalog"
+    HUGGINGFACE = "huggingface"

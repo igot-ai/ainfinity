@@ -1,10 +1,10 @@
 """Training configuration schemas for model, dataset, and training parameters"""
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from .base import AttnImpl, EvalStrategy, SaveStrategy, SchedulerType
+from .base import AttnImpl, DatalogSchema, DataSource, EvalStrategy, SaveStrategy, SchedulerType
 
 
 class ModelInfo(BaseModel):
@@ -39,22 +39,14 @@ class DatasetInfo(BaseModel):
     num_proc: Optional[int] = Field(default=1, ge=1, description="Number of processes for dataset loading")
 
 
-# class LrScheduler(BaseModel):
-#     """Learning rate scheduler configuration"""
-
-#     lr_scheduler_type: SchedulerType = Field(
-#         default=SchedulerType.LINEAR,
-#         description="Type of LR scheduler (e.g., linear, cosine)",
-#     )
-#     warmup_steps: int = Field(
-#         default=0, ge=0, description="Number of warmup steps for LR scheduler"
-#     )
-#     warmup_ratio: float = Field(
-#         default=0.0, ge=0.0, le=1.0, description="Warmup ratio for LR scheduler"
-#     )
-#     learning_rate: float = Field(
-#         default=2e-5, gt=0, description="Initial learning rate"
-#     )
+class Datalog(BaseModel):
+    source: DataSource = Field(default=DataSource.DATALOG, description="Data source type")
+    schema_type: DatalogSchema = Field(..., description="Type of datalog schema")
+    urls: List[str] = Field(..., description="List of URLs to the datalog files")
+    shuffle: bool = Field(default=True, description="Whether to shuffle the dataset")
+    train_eval_split: float = Field(default=0.8, ge=0.0, le=1.0, description="Train-test split ratio")
+    train_max_samples: Optional[int] = Field(default=None, description="Maximum samples for training set")
+    validation_max_samples: Optional[int] = Field(default=None, description="Maximum samples for validation set")
 
 
 class TrainingParams(BaseModel):
