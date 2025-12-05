@@ -1,26 +1,43 @@
+import base64
+import json
 import os
 import subprocess  # nosec B404
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml  # type: ignore[import-untyped]
+import yaml  # type: ignore
 
-from ainfinity.exceptions import JobAlreadyExistsException
-from ainfinity.schema.training_job import (
+from ainfinity.app.exceptions import JobAlreadyExistsException
+from ainfinity.app.schemas import (
     EvaluationMetrics,
     GPUMetrics,
     JobInfo,
     JobStatus,
-    LaunchJobRequest,
+    TrainingJobRequest,
     TrainingMetrics,
 )
-from ainfinity.utils import load_json, save_json
+from ainfinity.utils import load_json, logger, save_json, settings
+
+
+# Custom YAML representer for literal block scalars
+class literal_str(str):
+    """String subclass for YAML literal block scalar (|)"""
+
+
+def literal_str_representer(dumper, data):
+    """Represent literal_str as YAML literal block scalar"""
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+
+
+# Register the custom representer
+yaml.add_representer(literal_str, literal_str_representer)
 
 
 class SkyPilotService:
-    """Service to manage training jobs with SkyPilot"""
+    """Service for managing distributed training jobs using SkyPilot cloud orchestration."""
 
     def __init__(self, workspace_root: Optional[str] = None):
         """
@@ -35,41 +52,84 @@ class SkyPilotService:
         self._ensure_jobs_db()
 
     def _ensure_jobs_db(self):
-        """Ensure jobs database file exists"""
+        """Ensure jobs database file exists, create empty one if missing."""
         if not self.jobs_db_path.exists():
             self._save_jobs_db({})
 
     def _load_jobs_db(self) -> Dict:
-        """Load jobs database"""
+        """Load jobs database from JSON file.
+
+        Returns:
+            Dictionary of job data or empty dict if not found
+        """
         try:
             return load_json(self.jobs_db_path)
         except (FileNotFoundError, Exception):
             return {}
 
     def _save_jobs_db(self, jobs_db: Dict):
-        """Save jobs database"""
+        """Save jobs database to JSON file.
+
+        Args:
+            jobs_db: Dictionary containing all job data to persist
+        """
         save_json(jobs_db, self.jobs_db_path)
 
-    def _run_sky_command(self, cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:
+    def _run_sky_command(
+        self, cmd: List[str], check: bool = True, capture_output: bool = True
+    ) -> subprocess.CompletedProcess:
         """
         Run a SkyPilot CLI command
 
         Args:
             cmd: Command as list of strings
             check: Whether to raise exception on non-zero exit code
+            capture_output: Whether to capture output (False for interactive commands like launch)
 
         Returns:
             CompletedProcess object
         """
-        try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, check=check, cwd=str(self.workspace_root)
-            )  # nosec B603
-            return result
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"SkyPilot command failed: {e.stderr}") from e
+        print(f"Running SkyPilot command: {' '.join(cmd)}")
+        print("-" * 80)
 
-    def _generate_yaml_config(self, request: LaunchJobRequest) -> str:
+        try:
+            if capture_output:
+                # Capture output for parsing (used by status, logs, etc.)
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=check,
+                    cwd=str(self.workspace_root),
+                )  # nosec B603
+
+                # Print captured output for visibility
+                if result.stdout:
+                    print(result.stdout)
+                if result.stderr:
+                    print(result.stderr, file=sys.stderr)
+            else:
+                # Stream output in real-time (used by launch)
+                result = subprocess.run(
+                    cmd,
+                    text=True,
+                    check=check,
+                    cwd=str(self.workspace_root),
+                    stdout=None,  # Inherit parent's stdout
+                    stderr=None,  # Inherit parent's stderr
+                )  # nosec B603
+
+            print("-" * 80)
+            return result
+
+        except subprocess.CalledProcessError as e:
+            error_msg = f"SkyPilot command failed with exit code {e.returncode}"
+            if hasattr(e, "stderr") and e.stderr:
+                error_msg += f"\nError output: {e.stderr}"
+            print(f"ERROR: {error_msg}")
+            raise RuntimeError(error_msg) from e
+
+    def _generate_yaml_config(self, request: TrainingJobRequest) -> tuple[str, str]:
         """
         Generate SkyPilot YAML configuration from request
 
@@ -77,74 +137,174 @@ class SkyPilotService:
             request: Launch job request
 
         Returns:
-            Path to generated YAML file
+            Tuple of (path to generated YAML file, generated run_id)
         """
+        print("Request sent to create YAML config:", request)
         # Build the run command with training configuration
         run_commands = ["source .venv/bin/activate", ""]
 
-        # Build accelerate launch command
-        accelerate_config_path = f"./ainfinity/train/config/accelerate_config/{request.training.accelerate_config}"
-        python_file = "./ainfinity/train/finetune.py"
+        # Generate unique run_id for WandB tracking
+        # Use first 8 chars of base64 to match WandB's format
+        run_id = base64.urlsafe_b64encode(os.urandom(6)).decode().rstrip("=")[:8]
 
-        cmd_parts = ["accelerate launch", f"--config_file {accelerate_config_path}", python_file]
+        # Also support custom run_name from job_name
+        run_name = f"{request.job_name}-{run_id}"
 
-        # Add Hydra config overrides
-        overrides = []
-        if request.training.dataset:
-            overrides.append(f"dataset={request.training.dataset}")
-        if request.training.model:
-            overrides.append(f"model={request.training.model}")
-        if request.training.num_train_epochs:
-            overrides.append(f"training_arguments.num_train_epochs={request.training.num_train_epochs}")
-        if request.training.per_device_train_batch_size:
-            overrides.append(
-                f"training_arguments.per_device_train_batch_size={request.training.per_device_train_batch_size}"
-            )
-        if request.training.learning_rate:
-            overrides.append(f"training_arguments.learning_rate={request.training.learning_rate}")
-        if request.training.output_dir:
-            overrides.append(f"training_arguments.output_dir={request.training.output_dir}")
+        logger.info(f"🔑 Generated WandB run_id: {run_id}")
+        logger.info(f"📝 WandB run_name: {run_name}")
 
-        # Add extra arguments
-        if request.training.extra_args:
-            for key, value in request.training.extra_args.items():
-                overrides.append(f"{key}={value}")
+        # Create Hydra training config YAML file
+        training_config = {
+            "model": request.model.model_dump(mode="json"),
+            "dataset": request.dataset.model_dump(mode="json"),
+            "training_arguments": {
+                "output_dir": request.training_params.output_dir,
+                "num_train_epochs": request.training_params.num_train_epochs,
+                "per_device_train_batch_size": request.training_params.per_device_train_batch_size,
+                "per_device_eval_batch_size": request.training_params.per_device_eval_batch_size,
+                "eval_strategy": request.training_params.eval_strategy.value,
+                "save_strategy": request.training_params.save_strategy.value,
+                "gradient_accumulation_steps": request.training_params.gradient_accumulation_steps,
+                "learning_rate": request.training_params.learning_rate,
+                "lr_scheduler_type": request.training_params.lr_scheduler_type.value,
+                "warmup_steps": request.training_params.warmup_steps,
+                "warmup_ratio": request.training_params.warmup_ratio,
+                "bf16": request.training_params.bf16,
+                "fp16": request.training_params.fp16,
+                "logging_steps": request.training_params.logging_steps,
+                "save_steps": request.training_params.save_steps,
+                "eval_steps": request.training_params.eval_steps,
+            },
+            "seed": request.training_params.seed,
+            # WandB tracking configuration
+            "run_id": run_id,
+            "run_name": run_name,
+            "tags": ["finetuning"],
+        }
 
-        if overrides:
-            cmd_parts.extend(overrides)
+        # Write Hydra config to YAML
+        config_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".yaml",
+            delete=False,
+            dir=tempfile.gettempdir(),
+            prefix=f"hydra_config_{request.job_name}_",
+        )
+        yaml.dump(training_config, config_file, default_flow_style=False, sort_keys=False)
+        config_file.close()
+
+        # # Debug: Print training config YAML
+        # print(f"\n{'='*80}")
+        # print(f"Training Config YAML (Hydra): {config_file.name}")
+        # print(f"{'='*80}")
+        # print(
+        #     yaml.dump(
+        #         training_config,
+        #         default_flow_style=False,
+        #         sort_keys=False,
+        #         allow_unicode=True,
+        #     )
+        # )
+        # print(f"{'='*80}\n")
+
+        # Build accelerate launch command (run with Hydra config override)
+        accelerate_config_path = "./ainfinity/core/config/accelerate_config/ds2_config.yaml"
+        python_file = "./ainfinity/core/finetune.py"
+
+        # Path to config file on remote cluster (always /tmp on Linux clusters)
+        remote_config_path = f"/tmp/hydra_override_{request.job_name}.yaml"  # nosec B108
+
+        cmd_parts = [
+            "accelerate launch",
+            f"--config_file {accelerate_config_path}",
+            python_file,
+            "--config-dir /tmp",
+            f"--config-name {Path(remote_config_path).stem}",
+        ]
 
         run_commands.append(" ".join(cmd_parts))
 
         # Create YAML configuration
-        resources_config: Dict[str, Any] = {
-            "infra": request.resources.infra,
-            "accelerators": request.resources.accelerators,
-            "disk_size": request.resources.disk_size,
-            "image_id": request.resources.image_id,
+
+        resource_config: Dict[str, Any] = {
+            "cloud": request.resource.infra.value,  # Convert enum to string
+            "accelerators": request.resource.accelerators,
+            "disk_size": request.resource.disk_size,
         }
 
         # Add optional resource fields
-        if request.resources.memory:
-            resources_config["memory"] = request.resources.memory
-        if request.resources.cpus:
-            resources_config["cpus"] = request.resources.cpus
+        if request.resource.image_id:
+            resource_config["image_id"] = request.resource.image_id
+        if request.resource.memory:
+            resource_config["memory"] = request.resource.memory
+        if request.resource.cpus:
+            resource_config["cpus"] = request.resource.cpus
+
+        # Create setup and run scripts as literal block scalars (remove the " |" part!)
+        setup_script = literal_str("uv venv .venv --python=3.12\n" "source .venv/bin/activate\n" "uv sync --group gpu")
+
+        run_script = literal_str("\n".join(run_commands))
+
+        # Mount the training config file to the cluster
+        file_mounts = {
+            remote_config_path: config_file.name,
+        }
 
         config: Dict[str, Any] = {
             "name": request.job_name,
-            "resources": resources_config,
+            "envs": {
+                "WANDB_API_KEY": settings.WANDB_API_KEY,
+                "HF_TOKEN": settings.HF_TOKEN,
+                "WANDB_RUN_ID": run_id,  # Pass run_id as environment variable
+                "WANDB_RUN_NAME": run_name,  # Pass run_name as environment variable
+            },
+            "resources": resource_config,
             "workdir": ".",
-            "setup": "|\n  uv venv .venv --python=3.12\n  source .venv/bin/activate\n  uv sync --group gpu",
-            "run": "|\n  " + "\n  ".join(run_commands),
+            "file_mounts": file_mounts,
+            "setup": setup_script,
+            "run": run_script,
         }
 
+        yaml_dict = {k: v if not isinstance(v, literal_str) else str(v) for k, v in config.items()}
+        print(f"YAML configuration: {json.dumps(yaml_dict, indent=4)}")
+
         # Write to temporary file
-        temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, dir=str(self.workspace_root))
-        yaml.dump(config, temp_file, default_flow_style=False, sort_keys=False)
+        temp_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".yaml",
+            delete=False,
+            dir=tempfile.gettempdir(),
+            prefix=f"skypilot_task_{request.job_name}_",
+        )
+        yaml.dump(
+            config,
+            temp_file,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        )
         temp_file.close()
 
-        return temp_file.name
+        return temp_file.name, run_id
 
-    def launch_job(self, request: LaunchJobRequest) -> JobInfo:
+    def get_wandb_run_id(self, job_name: str) -> Optional[str]:
+        """
+        Get the WandB run_id for a training job
+
+        Args:
+            job_name: Name of the job
+
+        Returns:
+            WandB run_id if found, None otherwise
+        """
+        jobs_db = self._load_jobs_db()
+
+        if job_name not in jobs_db:
+            raise ValueError(f"Job '{job_name}' not found")
+
+        return jobs_db[job_name].get("wandb_run_id")
+
+    def launch_job(self, request: TrainingJobRequest) -> JobInfo:
         """
         Launch a training job with SkyPilot
 
@@ -159,44 +319,64 @@ class SkyPilotService:
         if request.job_name in jobs_db:
             raise JobAlreadyExistsException(f"Job with name '{request.job_name}' already exists")
 
-        # Generate YAML configuration
-        yaml_path = self._generate_yaml_config(request)
+        # Generate YAML configuration (this also generates run_id)
+        yaml_path, run_id = self._generate_yaml_config(request)
 
         try:
             # Build sky launch command
-            cmd = ["sky", "launch", "-y"]
+            cmd = ["sky", "launch", "-y", "--region", "asia-southeast1"]
 
             if request.detach:
-                cmd.append("--detach-setup")
+                cmd.append("-d")
 
             if request.down:
                 cmd.append("--down")
 
             cmd.extend(["-c", request.job_name, yaml_path])
 
-            # Launch the job
-            self._run_sky_command(cmd)
+            # Launch the job (stream output in real-time)
+            self._run_sky_command(cmd, capture_output=False)
 
-            # Create job info
+            # Create job info - store training config from request
+
+            # Create a TrainingRequest-like dict for backward compatibility with JobInfo
+            training_snapshot = {
+                "model": request.model.model_dump(mode="json"),
+                "dataset": request.dataset.model_dump(mode="json"),
+                "training_args": request.training_params.model_dump(mode="json"),
+            }
+
             job_info = JobInfo(
                 job_name=request.job_name,
                 cluster_name=request.job_name,
                 status=JobStatus.PENDING,
-                resources=request.resources,
-                training=request.training,
+                resource=request.resource,
+                training=training_snapshot,
                 created_at=datetime.now(),
+                wandb_run_id=run_id,
             )
 
             # Save to database
-            jobs_db[request.job_name] = job_info.model_dump(mode="json")
+            job_data = job_info.model_dump(mode="json")
+            jobs_db[request.job_name] = job_data
             self._save_jobs_db(jobs_db)
+
+            logger.info(f"✅ Job '{request.job_name}' created with WandB run_id: {run_id}")
 
             return job_info
 
         finally:
-            # Clean up temporary YAML file
+            # Clean up temporary files
             try:
                 os.unlink(yaml_path)
+            except OSError:
+                pass
+
+            # Clean up config file if it was created in _generate_yaml_config
+            try:
+                # Find and remove the config file created in _generate_yaml_config
+                for f in Path(self.workspace_root).glob(f"config_{request.job_name}_*.json"):
+                    os.unlink(f)
             except OSError:
                 pass
 
@@ -264,7 +444,7 @@ class SkyPilotService:
 
         # Stop the cluster
         try:
-            self._run_sky_command(["sky", "down", "-y", job_name])
+            self._run_sky_command(["sky", "stop", job_name], capture_output=False)
 
             # Update job info
             job_data = jobs_db[job_name]
@@ -282,24 +462,52 @@ class SkyPilotService:
             return JobInfo(**job_data)
 
     def list_jobs(self) -> List[JobInfo]:
-        """
-        List all training jobs
+        """List all training jobs from the database.
 
         Returns:
-            List of JobInfo objects
+            List of JobInfo objects with their configuration and status
+        """
+        jobs_db = self._load_jobs_db()
+        return [JobInfo(**job_data) for job_data in jobs_db.values()]
+
+    def update_job_status(self, job_name: str, new_status: JobStatus) -> JobInfo:
+        """Update the status of a job in the database.
+
+        Args:
+            job_name: Name of the job to update
+            new_status: New status to set
+
+        Returns:
+            Updated JobInfo object
+
+        Raises:
+            ValueError: If job not found
         """
         jobs_db = self._load_jobs_db()
 
-        jobs = []
-        for job_name in jobs_db:
-            try:
-                job_info = self.get_job_status(job_name)
-                jobs.append(job_info)
-            except Exception:
-                # If we can't get status, use stored data
-                jobs.append(JobInfo(**jobs_db[job_name]))
+        if job_name not in jobs_db:
+            raise ValueError(f"Job '{job_name}' not found")
 
-        return jobs
+        # Update status
+        job_data = jobs_db[job_name]
+        job_data["status"] = new_status.value
+
+        # Update ended_at if job is completed or failed
+        if new_status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.STOPPED):
+            if not job_data.get("ended_at"):
+                job_data["ended_at"] = datetime.now().isoformat()
+
+        # Update started_at if job is running
+        if new_status == JobStatus.RUNNING:
+            if not job_data.get("started_at"):
+                job_data["started_at"] = datetime.now().isoformat()
+
+        # Save updated data
+        jobs_db[job_name] = job_data
+        self._save_jobs_db(jobs_db)
+
+        logger.info(f"Updated job '{job_name}' status to {new_status.value}")
+        return JobInfo(**job_data)
 
     def get_job_logs(self, job_name: str, tail: int = 100) -> str:
         """
@@ -325,20 +533,24 @@ class SkyPilotService:
             return f"Error retrieving logs: {str(e)}"
 
     def delete_job(self, job_name: str) -> bool:
-        """
-        Delete a job from the database
+        """Delete a job record from the database (does not stop running cluster).
 
         Args:
-            job_name: Name of the job
+            job_name: Name of the job to delete
 
         Returns:
             True if deleted successfully
+
+        Raises:
+            ValueError: If job not found
         """
         jobs_db = self._load_jobs_db()
 
         if job_name not in jobs_db:
             raise ValueError(f"Job '{job_name}' not found")
 
+        # Delete the running cluster
+        self._run_sky_command(["sky", "down", "-y", job_name], capture_output=False)
         # Remove from database
         del jobs_db[job_name]
         self._save_jobs_db(jobs_db)

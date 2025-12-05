@@ -22,7 +22,7 @@ from ainfinity.core.helper import (
     print_trainable_parameters,
     select_torch_compute,
 )
-from ainfinity.utils import settings
+from ainfinity.utils import logger, settings
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
@@ -101,7 +101,7 @@ def load_hf_dataset(dataset_args: DictConfig) -> DatasetDict:
     dataset = load_dataset(
         dataset_args.name,
         split=None,
-        revision=dataset_args.get("revision", None),  # Load all splits
+        revision=dataset_args.get("revision", None),
     )
 
     # Prepare final splits according to config
@@ -134,12 +134,37 @@ def load_hf_dataset(dataset_args: DictConfig) -> DatasetDict:
 def main(config: DictConfig):
     accelerator = Accelerator()
 
+    # Get run_id from config, environment variable, or generate one
+    run_id = config.get("run_id", None) or os.getenv("WANDB_RUN_ID", None)
+
     if accelerator.is_local_main_process:
         wandb.login(key=settings.WANDB_API_KEY)  # type: ignore[attr-defined]
 
-        wandb.init(project=settings.PROJECT, job_type="training", anonymous="allow")  # type: ignore[attr-defined]
+        # Initialize WandB with the run_id
+        run = wandb.init(
+            project=settings.PROJECT,
+            job_type="finetuning",
+            id=run_id,  # Use provided run_id or let WandB auto-generate
+            resume="allow",  # Allow resuming if this run_id exists
+            name=config.get("run_name", None),  # Optional custom name
+            tags=config.get("tags", "finetuning"),  # Optional tags
+        )  # type: ignore[attr-defined]
+
+        # Log the run information
+        logger.info("=" * 80)
+        logger.info("🚀 WandB Run Information")
+        logger.info("=" * 80)
+        logger.info(f"Run ID: {run.id}")
+        logger.info(f"Run Name: {run.name}")
+        logger.info(f"Run URL: {run.url}")
+        logger.info(f"Project: {run.project}")
+        logger.info(f"Entity: {run.entity}")
+        logger.info(f"Full Path: {run.entity}/{run.project}/{run.id}")
+        logger.info("=" * 80)
+
     accelerator.wait_for_everyone()
 
+    logger.info("Starting training...")
     model_args = config.model
     dataset_args = config.dataset
     training_args = TrainingArguments(**config.training_arguments)
@@ -192,6 +217,108 @@ def main(config: DictConfig):
         tokenizer=tokenizer,
         mlm=False,
     )
+
+    # # ========== DEBUGGING SECTION START ==========
+    # This is due to eval loss is NaN!!!
+    # logger.info("=" * 80)
+    # logger.info("DEBUGGING TOKENIZATION AND DATA COLLATOR")
+    # logger.info("=" * 80)
+
+    # # Check instruction and response templates
+    # logger.info(f"Instruction template: {model_args.instruction_template}")
+    # logger.info(f"Response template: {model_args.response_template}")
+
+    # # Tokenize the templates to see their token IDs
+    # inst_tokens = tokenizer.encode(model_args.instruction_template, add_special_tokens=False)
+    # resp_tokens = tokenizer.encode(model_args.response_template, add_special_tokens=False)
+    # logger.info(f"Instruction template tokens: {inst_tokens}")
+    # logger.info(f"Response template tokens: {resp_tokens}")
+
+    # # Inspect a sample from training set
+    # logger.info("\n" + "=" * 80)
+    # logger.info("SAMPLE FROM TRAINING SET:")
+    # logger.info("=" * 80)
+    # train_sample = formated_dataset[dataset_args.split.train.name][0]
+    # logger.info(f"Keys in sample: {train_sample.keys()}")
+    # logger.info(f"Input IDs length: {len(train_sample['input_ids'])}")
+    # logger.info(f"First 20 input IDs: {train_sample['input_ids'][:20]}")
+    # logger.info(f"Last 20 input IDs: {train_sample['input_ids'][-20:]}")
+
+    # decoded_text = tokenizer.decode(train_sample["input_ids"])
+    # logger.info(f"\nDecoded text (first 500 chars):\n{decoded_text[:500]}")
+    # logger.info(f"\nDecoded text (last 500 chars):\n{decoded_text[-500:]}")
+
+    # # Check if response template appears in the decoded text
+    # if model_args.response_template in decoded_text:
+    #     logger.info(f"\n✓ Response template FOUND in decoded text")
+    # else:
+    #     logger.warning(f"\n✗ Response template NOT FOUND in decoded text")
+    #     logger.warning(f"This will cause the collator to mask ALL tokens, resulting in NaN loss!")
+
+    # # Inspect a sample from validation set
+    # logger.info("\n" + "=" * 80)
+    # logger.info("SAMPLE FROM VALIDATION SET:")
+    # logger.info("=" * 80)
+    # val_sample = formated_dataset[dataset_args.split.validation.name][0]
+    # logger.info(f"Keys in sample: {val_sample.keys()}")
+    # logger.info(f"Input IDs length: {len(val_sample['input_ids'])}")
+
+    # decoded_val_text = tokenizer.decode(val_sample["input_ids"])
+    # logger.info(f"\nDecoded text (first 500 chars):\n{decoded_val_text[:500]}")
+
+    # if model_args.response_template in decoded_val_text:
+    #     logger.info(f"\n✓ Response template FOUND in validation sample")
+    # else:
+    #     logger.warning(f"\n✗ Response template NOT FOUND in validation sample")
+
+    # # Test the data collator
+    # logger.info("\n" + "=" * 80)
+    # logger.info("TESTING DATA COLLATOR:")
+    # logger.info("=" * 80)
+
+    # # Create a small batch with one sample
+    # test_batch = [train_sample]
+    # try:
+    #     collated = collator(test_batch)
+    #     logger.info(f"Collator output keys: {collated.keys()}")
+
+    #     if "labels" in collated:
+    #         labels = collated["labels"][0]  # First sample in batch
+    #         logger.info(f"Labels shape: {labels.shape}")
+    #         logger.info(f"Labels (first 20): {labels[:20]}")
+    #         logger.info(f"Labels (last 20): {labels[-20:]}")
+
+    #         # Count how many tokens are NOT masked (-100)
+    #         non_masked = (labels != -100).sum().item()
+    #         total = labels.shape[0]
+    #         masked = (labels == -100).sum().item()
+
+    #         logger.info(f"\nLabel statistics:")
+    #         logger.info(f"  Total tokens: {total}")
+    #         logger.info(f"  Masked tokens (ignore): {masked} ({100*masked/total:.1f}%)")
+    #         logger.info(f"  Non-masked tokens (used for loss): {non_masked} ({100*non_masked/total:.1f}%)")
+
+    #         if non_masked == 0:
+    #             logger.error("\n" + "!" * 80)
+    #             logger.error("ERROR: ALL TOKENS ARE MASKED!")
+    #             logger.error("This will cause NaN loss during evaluation.")
+    #             logger.error("The response_template is likely not matching the tokenized sequence.")
+    #             logger.error("!" * 80)
+    #         else:
+    #             logger.info(f"\n✓ Found {non_masked} tokens for loss computation")
+    #     else:
+    #         logger.warning("No 'labels' key in collator output!")
+
+    # except Exception as e:
+    #     logger.error(f"Error testing collator: {e}")
+    #     import traceback
+
+    #     logger.error(traceback.format_exc())
+
+    # logger.info("\n" + "=" * 80)
+    # logger.info("END OF DEBUGGING SECTION")
+    # logger.info("=" * 80 + "\n")
+    # # ========== DEBUGGING SECTION END ==========
 
     trainer = Trainer(
         model=model,

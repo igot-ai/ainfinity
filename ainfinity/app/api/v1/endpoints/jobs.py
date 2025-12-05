@@ -5,14 +5,17 @@ Jobs Router - Training job management endpoints
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ainfinity.api.dependencies import get_training_service
-from ainfinity.schema.training_job import JobListResponse, JobResponse, LaunchJobRequest
+from ainfinity.app.api.dependencies import get_training_service
+from ainfinity.app.schemas import JobListResponse, JobResponse, TrainingJobRequest
+from ainfinity.app.schemas.base import JobStatus
+from ainfinity.app.services import wan
+from ainfinity.utils import logger
 
 router = APIRouter()
 
 
 @router.post("", response_model=JobResponse, status_code=201)
-async def launch_job(request: LaunchJobRequest):
+async def launch_job(request: TrainingJobRequest):
     """
     Launch a new training job
 
@@ -24,19 +27,39 @@ async def launch_job(request: LaunchJobRequest):
     """
     service = get_training_service()
     job_info = service.launch_job(request)
-    return JobResponse(success=True, message=f"Job '{request.job_name}' launched successfully", job_info=job_info)
+    return JobResponse(
+        success=True,
+        message=f"Job '{request.job_name}' launched successfully",
+        job_info=job_info,
+    )
 
 
 @router.get("", response_model=JobListResponse)
 async def list_jobs():
     """
-    List all training jobs
+    List all training jobs with WandB sync status check
 
     Returns:
-        List of all jobs
+        List of all jobs with their current status synced from WandB
     """
     service = get_training_service()
     jobs = service.list_jobs()
+    entity, name = wan.get_project_info()
+
+    # Sync job status from WandB and update database
+    for job in jobs:
+        if hasattr(job, "wandb_run_id") and job.wandb_run_id:
+            try:
+                wandb_info = wan.get_training_metrics_summary(entity, name, job.wandb_run_id)
+                if wandb_info and wandb_info.get("state"):
+                    # Map WandB state to our JobStatus
+                    wandb_state = wandb_info["state"]
+                    if wandb_state == "finished":
+                        service.update_job_status(job.job_name, JobStatus.COMPLETED)
+                        jobs[job.job_name].status = JobStatus.COMPLETED
+            except Exception as e:
+                logger.error(f"Error syncing WandB status for job {job.job_name}: {e}")
+
     return JobListResponse(success=True, jobs=jobs, total=len(jobs))
 
 
@@ -69,12 +92,17 @@ async def stop_job(job_name: str):
     """
     service = get_training_service()
     job_info = service.stop_job(job_name)
-    return JobResponse(success=True, message=f"Job '{job_name}' stopped successfully", job_info=job_info)
+    return JobResponse(
+        success=True,
+        message=f"Job '{job_name}' stopped successfully",
+        job_info=job_info,
+    )
 
 
 @router.get("/{job_name}/logs")
 async def get_job_logs(
-    job_name: str, tail: int = Query(100, ge=1, le=10000, description="Number of lines to retrieve")
+    job_name: str,
+    tail: int = Query(100, ge=1, le=10000, description="Number of lines to retrieve"),
 ):
     """
     Get logs from a job
@@ -126,8 +154,8 @@ async def get_job_metrics(job_name: str):
             "success": True,
             "job_name": job_name,
             "status": job_info.status,
-            "training_metrics": job_info.training_metrics.model_dump() if job_info.training_metrics else None,
-            "evaluation_metrics": job_info.evaluation_metrics.model_dump() if job_info.evaluation_metrics else None,
-            "gpu_metrics": job_info.gpu_metrics.model_dump() if job_info.gpu_metrics else None,
+            "training_metrics": (job_info.training_metrics.model_dump() if job_info.training_metrics else None),
+            "evaluation_metrics": (job_info.evaluation_metrics.model_dump() if job_info.evaluation_metrics else None),
+            "gpu_metrics": (job_info.gpu_metrics.model_dump() if job_info.gpu_metrics else None),
         }
     )

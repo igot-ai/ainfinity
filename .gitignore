@@ -5,6 +5,7 @@ venv/
 
 .idea/
 __pycache__/
+.skypilot_jobs.json
 
 
 *.pyc
@@ -12,5 +13,6 @@ __pycache__/
 *.pyd
 
 logs/
-wandb/
 outputs/
+app/models/alembic.ini
+data/*

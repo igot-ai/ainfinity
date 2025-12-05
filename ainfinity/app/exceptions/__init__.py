@@ -3,7 +3,7 @@ Exceptions package
 Centralized exception definitions and handlers
 """
 
-from ainfinity.exceptions.base import (
+from ainfinity.app.exceptions.base import (
     AIFinityException,
     ConfigurationError,
     JobAlreadyExistsException,
@@ -12,7 +12,7 @@ from ainfinity.exceptions.base import (
     SkyPilotException,
     ValidationException,
 )
-from ainfinity.exceptions.handlers import (
+from ainfinity.app.exceptions.handlers import (
     generic_exception_handler,
     job_exists_handler,
     job_not_found_handler,

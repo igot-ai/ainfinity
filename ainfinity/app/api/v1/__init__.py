@@ -4,7 +4,7 @@ API v1 Router
 
 from fastapi import APIRouter
 
-from ainfinity.api.v1.endpoints import health, jobs
+from ainfinity.app.api.v1.endpoints import health, jobs
 
 api_router = APIRouter()
 

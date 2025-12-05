@@ -5,7 +5,7 @@ HTTP exception handlers for FastAPI
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
-from ainfinity.exceptions.base import (
+from ainfinity.app.exceptions.base import (
     JobAlreadyExistsException,
     JobNotFoundException,
     ServiceException,
