@@ -7,6 +7,9 @@ from fastapi.responses import JSONResponse
 
 from ainfinity.app.api.dependencies import get_training_service
 from ainfinity.app.schemas import JobListResponse, JobResponse, TrainingJobRequest
+from ainfinity.app.schemas.base import JobStatus
+from ainfinity.app.services import wan
+from ainfinity.utils import logger
 
 router = APIRouter()
 
@@ -34,13 +37,29 @@ async def launch_job(request: TrainingJobRequest):
 @router.get("", response_model=JobListResponse)
 async def list_jobs():
     """
-    List all training jobs
+    List all training jobs with WandB sync status check
 
     Returns:
-        List of all jobs
+        List of all jobs with their current status synced from WandB
     """
     service = get_training_service()
     jobs = service.list_jobs()
+    entity, name = wan.get_project_info()
+
+    # Sync job status from WandB and update database
+    for job in jobs:
+        if hasattr(job, "wandb_run_id") and job.wandb_run_id:
+            try:
+                wandb_info = wan.get_training_metrics_summary(entity, name, job.wandb_run_id)
+                if wandb_info and wandb_info.get("state"):
+                    # Map WandB state to our JobStatus
+                    wandb_state = wandb_info["state"]
+                    if wandb_state == "finished":
+                        service.update_job_status(job.job_name, JobStatus.COMPLETED)
+                        jobs[job.job_name].status = JobStatus.COMPLETED
+            except Exception as e:
+                logger.error(f"Error syncing WandB status for job {job.job_name}: {e}")
+
     return JobListResponse(success=True, jobs=jobs, total=len(jobs))
 
 

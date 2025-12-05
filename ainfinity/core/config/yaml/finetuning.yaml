@@ -5,6 +5,11 @@ defaults:
 
 seed: 0
 
+# WandB Configuration (optional - will auto-generate if not provided)
+run_id: null  # Set this to a unique ID from your deployment system
+run_name: null  # Optional: Human-readable name
+tags: finetuning  # Optional: Tags for organizing runs
+
 training_arguments:
   optim: paged_adamw_32bit
   bf16: true

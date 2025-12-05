@@ -49,14 +49,96 @@ def setup_logger(
     return logger
 
 
-def get_logger(name: str) -> logging.Logger:
+class Logger:
     """
-    Get or create a logger
-
-    Args:
-        name: Logger name
-
-    Returns:
-        Logger instance
+    Logger class with convenient methods for different log levels
     """
-    return logging.getLogger(name)
+
+    def __init__(
+        self,
+        name: str,
+        level: str = "INFO",
+        log_file: Optional[str] = None,
+        format_string: Optional[str] = None,
+    ):
+        """
+        Initialize logger
+
+        Args:
+            name: Logger name
+            level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+            log_file: Optional file path for logging
+            format_string: Optional custom format string
+        """
+        self._logger = setup_logger(name, level, log_file, format_string)
+
+    def debug(self, message: str, *args, **kwargs) -> None:
+        """
+        Log a debug message
+
+        Args:
+            message: Log message
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
+        self._logger.debug(message, *args, **kwargs)
+
+    def info(self, message: str, *args, **kwargs) -> None:
+        """
+        Log an info message
+
+        Args:
+            message: Log message
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
+        self._logger.info(message, *args, **kwargs)
+
+    def warning(self, message: str, *args, **kwargs) -> None:
+        """
+        Log a warning message
+
+        Args:
+            message: Log message
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
+        self._logger.warning(message, *args, **kwargs)
+
+    def error(self, message: str, *args, **kwargs) -> None:
+        """
+        Log an error message
+
+        Args:
+            message: Log message
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
+        self._logger.error(message, *args, **kwargs)
+
+    def critical(self, message: str, *args, **kwargs) -> None:
+        """
+        Log a critical message
+
+        Args:
+            message: Log message
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
+        self._logger.critical(message, *args, **kwargs)
+
+    def exception(self, message: str, *args, **kwargs) -> None:
+        """
+        Log an exception with traceback
+
+        Args:
+            message: Log message
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+        """
+        self._logger.exception(message, *args, **kwargs)
+
+    @property
+    def logger(self) -> logging.Logger:
+        """Get the underlying logger instance"""
+        return self._logger

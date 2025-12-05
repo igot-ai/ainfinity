@@ -13,7 +13,6 @@ __pycache__/
 *.pyd
 
 logs/
-wandb/
 outputs/
 app/models/alembic.ini
 data/*

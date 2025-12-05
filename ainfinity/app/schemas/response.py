@@ -25,6 +25,7 @@ class JobInfo(BaseModel):
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     error_message: Optional[str] = None
+    wandb_run_id: Optional[str] = Field(default=None, description="WandB run ID for tracking")
 
     # Metrics
     training_metrics: Optional[TrainingMetrics] = Field(default=None, description="Current training metrics")
