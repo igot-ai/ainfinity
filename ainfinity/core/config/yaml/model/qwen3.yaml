@@ -6,7 +6,7 @@ cache_dir: ./cached
 revision:
 use_fast: true
 trust_remote_code: true
-attn_implementation: eager
+attn_implementation: flash_attention_2
 enable_thinking: false
 instruction_template: <|im_start|>user
 response_template: <|im_start|>assistant

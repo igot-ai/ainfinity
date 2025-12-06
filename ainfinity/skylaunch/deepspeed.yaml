@@ -3,7 +3,9 @@ name: finetune
 
 resources:
   infra: vast
-  accelerators: RTX3090:1  # or your desired GPU type
+  cpus: 16+
+  memory: 64+
+  accelerators: RTX4090:1  # or your desired GPU type
   disk_size: 100  # GB
   image_id: docker:nvidia/cuda:12.1.1-devel-ubuntu20.04
 
@@ -16,6 +18,7 @@ setup: |
 
   # Install all dependencies from pyproject.toml
   uv sync --group gpu
+  uv pip install flash-attn --no-build-isolation
 
 
 run: |

@@ -70,3 +70,10 @@ class DataSource(str, Enum):
 
     DATALOG = "datalog"
     HUGGINGFACE = "huggingface"
+
+
+class PaddingStrategy(str, Enum):
+    """Padding strategy options for tokenization"""
+
+    LONGEST = "longest"
+    MAX_LENGTH = "max_length"

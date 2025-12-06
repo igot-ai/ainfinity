@@ -29,6 +29,7 @@ dependencies = [
     "trl==0.18.2",
     "vastai-sdk>=0.1.12",
     "wandb>=0.23.0",
+    "pytest>=9.0.1",
 ]
 
 [dependency-groups]

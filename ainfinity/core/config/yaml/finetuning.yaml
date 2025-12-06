@@ -37,3 +37,4 @@ training_arguments:
   seed: 0
   push_to_hub: false
   use_liger_kernel: true
+  auto_find_batch_size: true

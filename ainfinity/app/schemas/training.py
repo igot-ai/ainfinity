@@ -4,7 +4,15 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from .base import AttnImpl, DatalogSchema, DataSource, EvalStrategy, SaveStrategy, SchedulerType
+from .base import (
+    AttnImpl,
+    DatalogSchema,
+    DataSource,
+    EvalStrategy,
+    PaddingStrategy,
+    SaveStrategy,
+    SchedulerType,
+)
 
 
 class ModelInfo(BaseModel):
@@ -16,6 +24,7 @@ class ModelInfo(BaseModel):
     trust_remote_code: bool = Field(default=True, description="Trust remote code when loading model")
     use_fast: bool = Field(default=True, description="Use fast tokenizer")
     revision: str = Field(default="main", description="Model revision/branch")
+    padding: PaddingStrategy = Field(default=PaddingStrategy.LONGEST, description="Padding strategy for tokenizer")
     padding_side: str = Field(default="left", description="Padding side for tokenizer")
     truncation_side: str = Field(default="right", description="Truncation side for tokenizer")
     instruction_template: str = Field(default="<|im_start|>user", description="Instruction template for completion")
